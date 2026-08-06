@@ -201,7 +201,8 @@ export const Route = createFileRoute("/api/public/tts")({
         const geminiRes = await tryGeminiTts(text, key);
         if (geminiRes) return geminiRes;
 
-        return new Response("TTS rate limited", { status: 429 });
+        // 4. If all server TTS options fail or rate limit, return JSON signal for client SpeechSynthesis
+        return Response.json({ fallback: true }, { status: 200 });
       },
     },
   },

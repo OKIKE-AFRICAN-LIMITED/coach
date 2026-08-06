@@ -513,7 +513,13 @@ function Chat({
       });
 
       if (!res.ok) {
-        // HTTP 429 or server error — use browser SpeechSynthesis fallback
+        speakBrowserFallback(text);
+        return;
+      }
+
+      const contentType = res.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        // Server returned fallback signal (e.g. rate limited) — use browser TTS
         speakBrowserFallback(text);
         return;
       }
