@@ -58,13 +58,17 @@ function pcmToWav(base64Pcm: string, sampleRate = 24_000): ArrayBuffer {
   return wavBuf;
 }
 
-/** Synthesize via Gemini 2.0 / 2.5 Flash TTS API using smooth "Aoede" voice */
-async function fetchGeminiAudio(text: string, apiKey: string): Promise<ArrayBuffer | null> {
+/** Synthesize via Gemini Flash TTS API using smooth "Aoede" voice */
+async function fetchGeminiAudio(
+  text: string,
+  apiKey: string,
+): Promise<{ buffer: ArrayBuffer | null; lastError: string }> {
   const models = [
-    "gemini-2.0-flash",
     "gemini-2.5-flash-preview-tts",
     "gemini-2.0-flash-exp",
   ];
+
+  let lastError = "";
 
   for (const model of models) {
     try {
@@ -87,7 +91,11 @@ async function fetchGeminiAudio(text: string, apiKey: string): Promise<ArrayBuff
         },
       );
 
-      if (!res.ok) continue;
+      if (!res.ok) {
+        lastError = `Model ${model} returned HTTP ${res.status}: ${await res.text()}`;
+        console.error("Gemini TTS fetch error:", lastError);
+        continue;
+      }
 
       const data = (await res.json()) as {
         candidates?: {
@@ -99,14 +107,15 @@ async function fetchGeminiAudio(text: string, apiKey: string): Promise<ArrayBuff
 
       const inlineData = data?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
       if (inlineData?.data) {
-        return pcmToWav(inlineData.data);
+        return { buffer: pcmToWav(inlineData.data), lastError: "" };
       }
-    } catch {
-      /* try next model */
+    } catch (e) {
+      lastError = String(e);
+      console.error("Gemini TTS exception:", e);
     }
   }
 
-  return null;
+  return { buffer: null, lastError };
 }
 
 export const Route = createFileRoute("/api/public/tts")({
@@ -131,13 +140,15 @@ export const Route = createFileRoute("/api/public/tts")({
         }
 
         // 2. Fetch smooth Aoede audio from Gemini
-        const wavBuffer = await fetchGeminiAudio(cleanText, key);
-        if (!wavBuffer) {
-          return new Response("Could not generate Gemini audio", { status: 502 });
+        const { buffer, lastError } = await fetchGeminiAudio(cleanText, key);
+        if (!buffer) {
+          return new Response(`TTS Error: ${lastError || "Could not generate audio"}`, {
+            status: 502,
+          });
         }
 
-        setCachedAudio(cleanText, wavBuffer);
-        return new Response(wavBuffer, {
+        setCachedAudio(cleanText, buffer);
+        return new Response(buffer, {
           headers: { "Content-Type": "audio/wav" },
         });
       },
