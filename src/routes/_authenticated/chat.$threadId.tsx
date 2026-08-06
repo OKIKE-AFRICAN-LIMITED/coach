@@ -363,9 +363,6 @@ function Chat({
     [],
   );
 
-  // Minimum confidence to accept a result (0 = no filter, 1 = perfect only).
-  const CONFIDENCE_THRESHOLD = 0.45;
-
   /** Starts one SpeechRecognition session. On end, re-arms itself unless stopped. */
   const startListening = useCallback(() => {
     if (!callActiveRef.current) return;
@@ -375,13 +372,17 @@ function Chat({
     if (!SR) return;
 
     // Abort any previous instance before creating a new one
-    try { callRecRef.current?.abort(); } catch { /* ignore */ }
+    try {
+      if (callRecRef.current) {
+        callRecRef.current.abort();
+      }
+    } catch { /* ignore */ }
+    callRecRef.current = null;
 
     const r = new SR();
     r.continuous = false;       // one utterance → natural pauses trigger onend
     r.interimResults = true;    // enables barge-in detection on interim results
     r.lang = "en-US";
-    callRecRef.current = r;
 
     r.onresult = async (e: SpeechRecognitionEvent) => {
       // Barge-in: stop TTS the moment we detect speech
@@ -392,21 +393,18 @@ function Chat({
       const last = e.results[e.results.length - 1];
       if (!last.isFinal) return; // interim result — keep waiting
 
-      // Noise filter: discard low-confidence results (mumble / background noise)
-      const confidence = last[0].confidence;
-      if (confidence > 0 && confidence < CONFIDENCE_THRESHOLD) return;
-
       const text = last[0].transcript.trim();
       if (!text) return;
 
       setCallStateSynced("thinking");
-      r.abort();
+      try { r.abort(); } catch { /* ignore */ }
+      callRecRef.current = null;
 
       try {
         await sendMessage({ text });
       } catch {
         setCallStateSynced("listening");
-        setTimeout(() => startListening(), 500);
+        setTimeout(() => startListening(), 400);
       }
     };
 
@@ -416,25 +414,29 @@ function Chat({
       const state = callStateRef.current;
       if (state === "thinking" || state === "speaking") return;
       // no-speech timeout or silence — restart quickly
-      setTimeout(() => startListening(), 300);
+      setTimeout(() => startListening(), 250);
     };
 
     r.onerror = (e: SpeechRecognitionErrorEvent) => {
-      if (!callActiveRef.current || e.error === "aborted") return;
-      if (e.error === "no-speech") return;
-      if (e.error !== "no-speech") {
-        toast.error(`Mic error: ${e.error}`);
+      callRecRef.current = null; // mark dead on error
+      if (!callActiveRef.current || e.error === "aborted" || e.error === "no-speech") return;
+      if (e.error === "network") {
+        setTimeout(() => startListening(), 800);
+        return;
       }
+      toast.error(`Mic error: ${e.error}`);
     };
 
+    callRecRef.current = r;
     try {
       r.start();
       setCallStateSynced("listening");
     } catch {
-      // Failed to start — schedule a retry
-      setTimeout(() => startListening(), 500);
+      // If start failed, reset ref to null so watchdog/retry can pick it up
+      callRecRef.current = null;
+      setTimeout(() => startListening(), 400);
     }
-  }, [sendMessage, setCallStateSynced, CONFIDENCE_THRESHOLD]);
+  }, [sendMessage, setCallStateSynced]);
 
   // ── TTS: Gemini voice playback ─────────────────────────────────────────────
   const [voiceOn, setVoiceOn] = useState(true);
@@ -442,6 +444,11 @@ function Chat({
   const spokenRef = useRef<Set<string>>(new Set());
 
   const speak = useCallback(async (text: string) => {
+    // Show speaking indicator immediately while fetching audio
+    if (callActiveRef.current) {
+      setCallStateSynced("speaking");
+    }
+
     try {
       const res = await fetch("/api/public/tts", {
         method: "POST",
@@ -449,7 +456,6 @@ function Chat({
         body: JSON.stringify({ text }),
       });
       if (!res.ok) {
-        // If TTS fails during call mode, resume listening after brief delay
         if (callActiveRef.current) {
           setCallStateSynced("listening");
           setTimeout(() => startListening(), 400);

@@ -79,7 +79,7 @@ export const Route = createFileRoute("/api/public/tts")({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: text.slice(0, 5_000) }] }],
+              contents: [{ parts: [{ text: text.slice(0, 1_000) }] }],
               generationConfig: {
                 responseModalities: ["AUDIO"],
                 speechConfig: {
