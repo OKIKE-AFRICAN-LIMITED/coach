@@ -547,18 +547,24 @@ function Chat({
     if (status !== "ready") return;
     const last = messages[messages.length - 1];
     if (!last || last.role !== "assistant") return;
-    if (spokenRef.current.has(last.id)) return;
-    spokenRef.current.add(last.id);
 
+    // Extract text parts
     const text = last.parts
       .map((p) => (p.type === "text" ? p.text : ""))
       .join(" ")
       .trim();
 
-    if (voiceOn && text) {
+    // If message only contains tool calls (no text response yet), stay in thinking state
+    if (!text) return;
+
+    // Check if this text response has already been spoken
+    if (spokenRef.current.has(last.id)) return;
+    spokenRef.current.add(last.id);
+
+    if (voiceOn) {
       void speak(text);
     } else if (callActiveRef.current) {
-      // Voice off or no text: resume listening in call mode
+      // Voice off: resume listening in call mode
       setCallStateSynced("listening");
       setTimeout(() => startListening(), 400);
     }
