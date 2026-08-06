@@ -438,66 +438,10 @@ function Chat({
     }
   }, [sendMessage, setCallStateSynced]);
 
-  // ── TTS: Gemini voice playback with browser SpeechSynthesis fallback ──────
+  // ── TTS: Gemini "Aoede" Neural Voice Playback ──────────────────────────────
   const [voiceOn, setVoiceOn] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const spokenRef = useRef<Set<string>>(new Set());
-
-  const speakBrowserFallback = useCallback((text: string) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      if (callActiveRef.current) {
-        setCallStateSynced("listening");
-        setTimeout(() => startListening(), 400);
-      }
-      return;
-    }
-
-    try {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text.slice(0, 600));
-      u.lang = "en-US";
-      u.rate = 1.05;
-
-      // Select best female/natural voice available in browser
-      const voices = window.speechSynthesis.getVoices();
-      const prefVoice = voices.find(
-        (v) =>
-          v.lang.startsWith("en") &&
-          (v.name.includes("Google") ||
-            v.name.includes("Natural") ||
-            v.name.includes("Samantha") ||
-            v.name.includes("Zira") ||
-            v.name.includes("Victoria")),
-      );
-      if (prefVoice) u.voice = prefVoice;
-
-      u.onstart = () => {
-        if (callActiveRef.current) setCallStateSynced("speaking");
-      };
-      u.onend = () => {
-        if (callActiveRef.current) {
-          setCallStateSynced("listening");
-          setTimeout(() => startListening(), 400);
-        }
-      };
-      u.onerror = () => {
-        if (callActiveRef.current) {
-          setCallStateSynced("listening");
-          setTimeout(() => startListening(), 400);
-        }
-      };
-
-      try { callRecRef.current?.abort(); } catch { /* ignore */ }
-      callRecRef.current = null;
-
-      window.speechSynthesis.speak(u);
-    } catch {
-      if (callActiveRef.current) {
-        setCallStateSynced("listening");
-        setTimeout(() => startListening(), 400);
-      }
-    }
-  }, [setCallStateSynced, startListening]);
 
   const speak = useCallback(async (text: string) => {
     // Show speaking indicator immediately while fetching audio
@@ -513,14 +457,10 @@ function Chat({
       });
 
       if (!res.ok) {
-        speakBrowserFallback(text);
-        return;
-      }
-
-      const contentType = res.headers.get("content-type") ?? "";
-      if (contentType.includes("application/json")) {
-        // Server returned fallback signal (e.g. rate limited) — use browser TTS
-        speakBrowserFallback(text);
+        if (callActiveRef.current) {
+          setCallStateSynced("listening");
+          setTimeout(() => startListening(), 400);
+        }
         return;
       }
 
@@ -528,25 +468,40 @@ function Chat({
       const url = URL.createObjectURL(blob);
       const audio = audioRef.current;
       if (!audio) {
-        speakBrowserFallback(text);
+        if (callActiveRef.current) {
+          setCallStateSynced("listening");
+          setTimeout(() => startListening(), 400);
+        }
         return;
       }
 
       audio.src = url;
       audio.load();
-      audio.onended = () => URL.revokeObjectURL(url);
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        if (callActiveRef.current) {
+          setCallStateSynced("listening");
+          setTimeout(() => startListening(), 400);
+        }
+      };
 
       // Abort mic before playing TTS so speaker audio isn't recorded as user input
       try { callRecRef.current?.abort(); } catch { /* ignore */ }
       callRecRef.current = null;
 
       await audio.play().catch(() => {
-        speakBrowserFallback(text);
+        if (callActiveRef.current) {
+          setCallStateSynced("listening");
+          setTimeout(() => startListening(), 400);
+        }
       });
     } catch {
-      speakBrowserFallback(text);
+      if (callActiveRef.current) {
+        setCallStateSynced("listening");
+        setTimeout(() => startListening(), 400);
+      }
     }
-  }, [setCallStateSynced, startListening, speakBrowserFallback]);
+  }, [setCallStateSynced, startListening]);
 
   // Auto-speak new assistant messages when voice is on
   useEffect(() => {
