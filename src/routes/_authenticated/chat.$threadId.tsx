@@ -537,10 +537,7 @@ function Chat({
       }
     };
     r.onresult = async (e: SpeechRecognitionEvent) => {
-      const result = e.results[0][0];
-      // Reject low-confidence results (background noise misrecognized as speech)
-      if (result.confidence > 0 && result.confidence < CONFIDENCE_THRESHOLD) return;
-      const text = result.transcript.trim();
+      const text = e.results[0][0].transcript.trim();
       if (text) await sendMessage({ text });
     };
 
@@ -551,7 +548,7 @@ function Chat({
       toast.error("Could not start microphone");
       setRecording(false);
     }
-  }, [sendMessage, CONFIDENCE_THRESHOLD]);
+  }, [sendMessage]);
 
   const stopRecording = useCallback(() => {
     micRef.current?.stop();
