@@ -259,6 +259,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      disconnect_google_integration: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       get_admin_stats: {
         Args: Record<PropertyKey, never>
         Returns: Json

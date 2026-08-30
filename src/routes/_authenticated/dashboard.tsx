@@ -3,11 +3,21 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getBriefing, updateTask } from "@/lib/tasks.functions";
 import { createThread } from "@/lib/threads.functions";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { fetchUpcomingCalendarEvents, fetchRecentEmails } from "@/lib/google.functions";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CalendarClock, Sparkles, MessageCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarClock,
+  Sparkles,
+  MessageCircle,
+  Calendar as CalendarIcon,
+  Mail as MailIcon,
+  ExternalLink,
+  Loader2,
+} from "lucide-react";
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -20,10 +30,22 @@ function Dashboard() {
   const briefingFn = useServerFn(getBriefing);
   const updateFn = useServerFn(updateTask);
   const createT = useServerFn(createThread);
+  const eventsFn = useServerFn(fetchUpcomingCalendarEvents);
+  const emailsFn = useServerFn(fetchRecentEmails);
 
   const { data, isLoading } = useQuery({
     queryKey: ["briefing"],
     queryFn: () => briefingFn(),
+  });
+
+  const { data: calendarData, isLoading: eventsLoading } = useQuery({
+    queryKey: ["upcomingEvents"],
+    queryFn: () => eventsFn(),
+  });
+
+  const { data: emailData, isLoading: emailsLoading } = useQuery({
+    queryKey: ["recentEmails"],
+    queryFn: () => emailsFn(),
   });
 
   const toggle = useMutation({
@@ -44,7 +66,7 @@ function Dashboard() {
     onError: (e) => {
       console.error("Failed to create chat:", e);
       alert("Failed to create chat: " + String(e));
-    }
+    },
   });
 
   const greeting = (() => {
@@ -84,7 +106,99 @@ function Dashboard() {
         <StatCard label="Total open" value={data?.counts.total ?? 0} tone="muted" />
       </div>
 
-      <Section title="Overdue" items={data?.overdue ?? []} empty="Nothing overdue — good work." onToggle={(id) => toggle.mutate(id)} />
+      {/* Google Workspace Widgets Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Calendar Agenda Widget */}
+        <Card className="flex flex-col">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4 text-blue-500" /> Google Calendar Agenda
+              </CardTitle>
+              {eventsLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+            </div>
+            <CardDescription className="text-xs">Upcoming events for the next 7 days</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col justify-between">
+            {!calendarData?.connected ? (
+              <div className="py-6 text-center space-y-2">
+                <p className="text-xs text-muted-foreground">Connect Google Workspace to see your meetings here.</p>
+                <Button variant="outline" size="sm" asChild>
+                  <Link to="/settings">Connect Calendar</Link>
+                </Button>
+              </div>
+            ) : calendarData.events.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4">No upcoming events found for this week.</p>
+            ) : (
+              <ul className="divide-y text-xs space-y-2">
+                {calendarData.events.slice(0, 4).map((evt) => (
+                  <li key={evt.id} className="pt-2 flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate text-slate-800 dark:text-slate-200">{evt.summary}</p>
+                      {evt.location && <p className="text-[11px] text-muted-foreground truncate">{evt.location}</p>}
+                    </div>
+                    <div className="text-right shrink-0 text-[11px] text-muted-foreground">
+                      {evt.start ? (
+                        <span>{format(new Date(evt.start), "MMM d, h:mm a")}</span>
+                      ) : (
+                        <span>All day</span>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Gmail Unread Widget */}
+        <Card className="flex flex-col">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <MailIcon className="h-4 w-4 text-red-500" /> Gmail Unread Digest
+              </CardTitle>
+              {emailsLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+            </div>
+            <CardDescription className="text-xs">Recent unread messages from your inbox</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col justify-between">
+            {!emailData?.connected ? (
+              <div className="py-6 text-center space-y-2">
+                <p className="text-xs text-muted-foreground">Connect Google Workspace to view unread messages.</p>
+                <Button variant="outline" size="sm" asChild>
+                  <Link to="/settings">Connect Gmail</Link>
+                </Button>
+              </div>
+            ) : emailData.emails.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4">No unread emails in your inbox.</p>
+            ) : (
+              <ul className="divide-y text-xs space-y-2">
+                {emailData.emails.slice(0, 3).map((email) => (
+                  <li key={email.id} className="pt-2 space-y-0.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium truncate text-slate-800 dark:text-slate-200">
+                        {email.from ? email.from.replace(/<.*>/, "").trim() : "Unknown Sender"}
+                      </span>
+                      {email.date && (
+                        <span className="text-[10px] text-muted-foreground shrink-0">
+                          {format(new Date(email.date), "MMM d")}
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-semibold text-slate-700 dark:text-slate-300 truncate">
+                      {email.subject || "(No Subject)"}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground line-clamp-1">{email.snippet}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Section title="Overdue Tasks" items={data?.overdue ?? []} empty="Nothing overdue — good work." onToggle={(id) => toggle.mutate(id)} />
       <Section title="Due today" items={data?.dueToday ?? []} empty="Nothing scheduled for today." onToggle={(id) => toggle.mutate(id)} />
       <Section title="Neglected (no due date, > 3 days)" items={data?.neglected ?? []} empty="No forgotten tasks. Nice." onToggle={(id) => toggle.mutate(id)} />
 

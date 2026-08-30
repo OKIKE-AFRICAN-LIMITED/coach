@@ -14,7 +14,6 @@ import {
   Sparkles,
   Command
 } from "lucide-react";
-import coachLogo from "@/assets/coach-logo.png";
 
 export const Route = createFileRoute("/")({
   component: LandingPage,
@@ -58,7 +57,7 @@ function LandingPage() {
       {/* Glassmorphic Navbar */}
       <nav className="fixed top-0 inset-x-0 h-16 border-b border-black/5 bg-white/70 backdrop-blur-xl z-50 px-6 lg:px-12 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
-          <img src={coachLogo} alt="Coach Logo" className="h-8 w-8" />
+          <img src="/logo.png" alt="Coach Logo" className="h-8 w-8 object-contain" />
           <span className="font-bold text-xl tracking-tight">Coach</span>
         </div>
         <div className="flex items-center gap-6">

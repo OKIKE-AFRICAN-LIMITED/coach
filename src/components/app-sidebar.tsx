@@ -17,7 +17,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { listThreads, createThread, deleteThread } from "@/lib/threads.functions";
-import coachLogo from "@/assets/coach-logo.png";
 import { toast } from "sonner";
 
 const mainItems = [
@@ -70,7 +69,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <Link to="/dashboard" className="flex items-center gap-2 px-2 py-1">
-          <img src={coachLogo} alt="Coach" width={28} height={28} className="h-7 w-7" />
+          <img src="/logo.png" alt="Coach" width={28} height={28} className="h-7 w-7 object-contain" />
           <span className="font-semibold text-base group-data-[collapsible=icon]:hidden">Coach</span>
         </Link>
       </SidebarHeader>

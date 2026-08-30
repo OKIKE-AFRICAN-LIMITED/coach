@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import coachLogo from "@/assets/coach-logo.png";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -91,7 +90,7 @@ function AuthPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted px-4">
       <Card className="w-full max-w-md p-8 space-y-6">
         <div className="flex flex-col items-center text-center space-y-2">
-          <img src={coachLogo} alt="Coach" width={64} height={64} className="h-16 w-16" />
+          <img src="/logo.png" alt="Coach" width={64} height={64} className="h-16 w-16 object-contain" />
           <h1 className="text-2xl font-semibold">Welcome to Coach</h1>
           <p className="text-sm text-muted-foreground">
             Your personal task assistant. Sign in to keep on track.

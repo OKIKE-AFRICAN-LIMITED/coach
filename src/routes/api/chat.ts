@@ -12,42 +12,8 @@ import { google } from "@ai-sdk/google";
 import type { Database } from "@/integrations/supabase/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-async function getGoogleAccessToken(supabase: SupabaseClient<Database>, userId: string) {
-  const { data } = await supabase
-    .from("user_integrations")
-    .select("google_refresh_token")
-    .eq("user_id", userId)
-    .single();
+import { getGoogleAccessToken } from "@/lib/google.functions";
 
-  if (!data?.google_refresh_token) {
-    throw new Error("Google account not connected. Please sign in with Google to enable this feature.");
-  }
-
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    throw new Error("Server missing Google OAuth credentials.");
-  }
-
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: data.google_refresh_token,
-      grant_type: "refresh_token",
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to refresh Google Access Token. Please sign in with Google again.");
-  }
-
-  const tokenData = await response.json();
-  return tokenData.access_token as string;
-}
 
 export const Route = createFileRoute("/api/chat")({
   server: {
@@ -284,7 +250,8 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
                   if (!res.ok) return { error: `Calendar error ${res.status}` };
                   const data = await res.json();
                   return {
-                    events: (data.items ?? []).map((e: { summary?: string; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string }; location?: string }) => ({
+                    events: (data.items ?? []).map((e: { id?: string; summary?: string; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string }; location?: string }) => ({
+                      id: e.id,
                       summary: e.summary,
                       start: e.start?.dateTime ?? e.start?.date,
                       end: e.end?.dateTime ?? e.end?.date,
@@ -333,8 +300,101 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
                 }
               },
             }),
+            update_calendar_event: tool({
+              description: "Update an existing Google Calendar event.",
+              inputSchema: z.object({
+                eventId: z.string().min(1),
+                summary: z.string().min(1).max(300).optional(),
+                description: z.string().max(2000).optional(),
+                startISO: z.string().datetime().optional(),
+                endISO: z.string().datetime().optional(),
+                location: z.string().max(300).optional(),
+              }),
+              execute: async ({ eventId, summary, description, startISO, endISO, location }) => {
+                try {
+                  const token = await getGoogleAccessToken(supabase, userId);
+                  const patchData: Record<string, unknown> = {};
+                  if (summary !== undefined) patchData.summary = summary;
+                  if (description !== undefined) patchData.description = description;
+                  if (location !== undefined) patchData.location = location;
+                  if (startISO) patchData.start = { dateTime: startISO };
+                  if (endISO) patchData.end = { dateTime: endISO };
+
+                  const res = await fetch(
+                    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`,
+                    {
+                      method: "PATCH",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify(patchData),
+                    },
+                  );
+                  if (!res.ok) return { error: `Calendar update error ${res.status}: ${await res.text()}` };
+                  const data = await res.json();
+                  return { ok: true, eventId: data.id, updatedSummary: data.summary };
+                } catch (e) {
+                  return { error: e instanceof Error ? e.message : "Calendar update failed" };
+                }
+              },
+            }),
+            delete_calendar_event: tool({
+              description: "Delete or cancel an existing Google Calendar event.",
+              inputSchema: z.object({
+                eventId: z.string().min(1).describe("The Google Calendar event ID"),
+              }),
+              execute: async ({ eventId }) => {
+                try {
+                  const token = await getGoogleAccessToken(supabase, userId);
+                  const res = await fetch(
+                    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`,
+                    {
+                      method: "DELETE",
+                      headers: { Authorization: `Bearer ${token}` },
+                    },
+                  );
+                  if (!res.ok && res.status !== 204) {
+                    return { error: `Calendar delete error ${res.status}` };
+                  }
+                  return { ok: true, deletedEventId: eventId };
+                } catch (e) {
+                  return { error: e instanceof Error ? e.message : "Calendar delete failed" };
+                }
+              },
+            }),
+            check_free_busy: tool({
+              description: "Query free/busy availability on the user's primary Google Calendar.",
+              inputSchema: z.object({
+                timeMinISO: z.string().datetime(),
+                timeMaxISO: z.string().datetime(),
+              }),
+              execute: async ({ timeMinISO, timeMaxISO }) => {
+                try {
+                  const token = await getGoogleAccessToken(supabase, userId);
+                  const res = await fetch("https://www.googleapis.com/calendar/v3/freeBusy", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                      timeMin: timeMinISO,
+                      timeMax: timeMaxISO,
+                      items: [{ id: "primary" }],
+                    }),
+                  });
+                  if (!res.ok) return { error: `FreeBusy error ${res.status}` };
+                  const data = await res.json();
+                  const busySlots = data.calendars?.primary?.busy ?? [];
+                  return { busy: busySlots };
+                } catch (e) {
+                  return { error: e instanceof Error ? e.message : "Freebusy check failed" };
+                }
+              },
+            }),
             search_emails: tool({
-              description: "Search the user's Gmail inbox. Returns subjects and snippets.",
+              description: "Search the user's Gmail inbox. Returns email IDs, subjects, and snippets.",
               inputSchema: z.object({
                 query: z.string().max(200).default("is:unread").describe("Gmail search query"),
                 maxResults: z.number().int().min(1).max(15).default(5),
@@ -348,18 +408,55 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
                   if (!list.ok) return { error: `Gmail error ${list.status}` };
                   const { messages = [] } = await list.json();
                   const details = await Promise.all(
-                    (messages as { id: string }[]).slice(0, maxResults).map(async (m) => {
+                    (messages as { id: string; threadId: string }[]).slice(0, maxResults).map(async (m) => {
                       const r = await fetch(`${base}/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`, { headers });
                       if (!r.ok) return null;
                       const d = await r.json();
                       const h = (d.payload?.headers ?? []) as { name: string; value: string }[];
                       const get = (n: string) => h.find((x) => x.name.toLowerCase() === n.toLowerCase())?.value;
-                      return { from: get("From"), subject: get("Subject"), date: get("Date"), snippet: d.snippet };
+                      return {
+                        id: m.id,
+                        threadId: m.threadId,
+                        from: get("From"),
+                        subject: get("Subject"),
+                        date: get("Date"),
+                        snippet: d.snippet,
+                      };
                     }),
                   );
                   return { emails: details.filter(Boolean) };
                 } catch (e) {
                   return { error: e instanceof Error ? e.message : "Gmail access failed" };
+                }
+              },
+            }),
+            read_email_thread: tool({
+              description: "Read details and message content for a specific Gmail message or thread.",
+              inputSchema: z.object({
+                messageId: z.string().min(1),
+              }),
+              execute: async ({ messageId }) => {
+                try {
+                  const token = await getGoogleAccessToken(supabase, userId);
+                  const res = await fetch(
+                    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}?format=full`,
+                    { headers: { Authorization: `Bearer ${token}` } },
+                  );
+                  if (!res.ok) return { error: `Gmail read error ${res.status}` };
+                  const d = await res.json();
+                  const h = (d.payload?.headers ?? []) as { name: string; value: string }[];
+                  const get = (n: string) => h.find((x) => x.name.toLowerCase() === n.toLowerCase())?.value;
+                  return {
+                    id: d.id,
+                    threadId: d.threadId,
+                    from: get("From"),
+                    to: get("To"),
+                    subject: get("Subject"),
+                    date: get("Date"),
+                    snippet: d.snippet,
+                  };
+                } catch (e) {
+                  return { error: e instanceof Error ? e.message : "Gmail read failed" };
                 }
               },
             }),
@@ -390,6 +487,38 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
                   return { ok: true };
                 } catch (e) {
                   return { error: e instanceof Error ? e.message : "Gmail access failed" };
+                }
+              },
+            }),
+            reply_to_email: tool({
+              description: "Reply to an existing Gmail email thread.",
+              inputSchema: z.object({
+                to: z.string().email(),
+                subject: z.string().min(1).max(300),
+                threadId: z.string().min(1),
+                body: z.string().min(1).max(10000),
+              }),
+              execute: async ({ to, subject, threadId, body: emailBody }) => {
+                try {
+                  const token = await getGoogleAccessToken(supabase, userId);
+                  const replySubject = subject.toLowerCase().startsWith("re:") ? subject : `Re: ${subject}`;
+                  const rfc = [`To: ${to}`, `Subject: ${replySubject}`, 'Content-Type: text/plain; charset="UTF-8"', "", emailBody].join("\r\n");
+                  const raw = Buffer.from(rfc).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+                  const res = await fetch(
+                    "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify({ raw, threadId }),
+                    },
+                  );
+                  if (!res.ok) return { error: `Gmail reply error ${res.status}: ${await res.text()}` };
+                  return { ok: true, threadId };
+                } catch (e) {
+                  return { error: e instanceof Error ? e.message : "Gmail reply failed" };
                 }
               },
             }),
