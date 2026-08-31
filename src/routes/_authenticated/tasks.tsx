@@ -3,17 +3,13 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listTasks, createTask, updateTask, deleteTask } from "@/lib/tasks.functions";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, CheckCircle2, Clock, Filter as FilterIcon, CheckSquare, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -21,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/tasks")({
   component: TasksPage,
 });
 
-type Filter = "today" | "upcoming" | "overdue" | "all" | "done";
+type Filter = "all" | "today" | "overdue" | "upcoming" | "done";
 
 function TasksPage() {
   const qc = useQueryClient();
@@ -30,7 +26,7 @@ function TasksPage() {
   const del = useServerFn(deleteTask);
   const [filter, setFilter] = useState<Filter>("all");
 
-  const { data: tasks = [] } = useQuery({
+  const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["tasks"],
     queryFn: () => list(),
   });
@@ -43,11 +39,13 @@ function TasksPage() {
       qc.invalidateQueries({ queryKey: ["briefing"] });
     },
   });
+
   const delM = useMutation({
     mutationFn: async (id: string) => del({ data: { id } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["briefing"] });
+      toast.success("Task deleted");
     },
   });
 
@@ -65,61 +63,129 @@ function TasksPage() {
     return true;
   });
 
+  const filters: { id: Filter; label: string }[] = [
+    { id: "all", label: "All Tasks" },
+    { id: "today", label: "Today" },
+    { id: "overdue", label: "Overdue" },
+    { id: "upcoming", label: "Upcoming" },
+    { id: "done", label: "Done" },
+  ];
+
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Tasks</h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage everything on your plate.</p>
+    <div className="min-h-screen bg-[#050507] text-[#F3F4F6] p-4 sm:p-6 lg:p-8 font-sans selection:bg-[#D4AF37]/30 selection:text-[#F5E0A3]">
+      <div className="max-w-5xl mx-auto space-y-6">
+        
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-[#1F2336]">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2.5">
+              <CheckSquare className="h-6 w-6 text-[#D4AF37]" />
+              Tasks Workspace
+            </h1>
+            <p className="text-sm text-[#8A8F9E] mt-1">Manage and track your execution priorities.</p>
+          </div>
+          <NewTaskDialog />
         </div>
-        <NewTaskDialog />
-      </div>
 
-      <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
-        <TabsList>
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="today">Today</TabsTrigger>
-          <TabsTrigger value="overdue">Overdue</TabsTrigger>
-          <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-          <TabsTrigger value="done">Done</TabsTrigger>
-        </TabsList>
-      </Tabs>
+        {/* Filter Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs font-medium">
+          {filters.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setFilter(f.id)}
+              className={`px-4 py-2 rounded-xl border transition-all ${
+                filter === f.id
+                  ? "bg-[#1A1810] border-[#D4AF37]/50 text-[#F5E0A3] font-semibold shadow-sm"
+                  : "bg-[#0F111A] border-[#1F2336] text-[#8A8F9E] hover:text-white hover:border-[#D4AF37]/30"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {filtered.length === 0 ? (
-            <p className="p-6 text-sm text-muted-foreground text-center">No tasks here.</p>
+        {/* Task List Card */}
+        <div className="bg-[#0F111A] border border-[#1F2336] rounded-xl p-5 sm:p-6 shadow-xl space-y-3">
+          {isLoading ? (
+            <div className="py-12 flex items-center justify-center text-xs text-[#8A8F9E]">
+              <Loader2 className="h-4 w-4 animate-spin mr-2 text-[#D4AF37]" />
+              Loading tasks...
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="py-12 text-center text-xs text-[#8A8F9E] space-y-2">
+              <p>No tasks found in this view.</p>
+            </div>
           ) : (
-            <ul className="divide-y">
-              {filtered.map((t) => (
-                <li key={t.id} className="flex items-center gap-3 p-3 hover:bg-muted/40">
-                  <Checkbox
-                    checked={t.status === "done"}
-                    onCheckedChange={(v) =>
-                      toggleM.mutate({ id: t.id, status: v ? "done" : "todo" })
-                    }
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${t.status === "done" ? "line-through text-muted-foreground" : ""}`}>
-                      {t.title}
-                    </p>
-                    {t.notes && <p className="text-xs text-muted-foreground truncate">{t.notes}</p>}
-                    {t.due_at && (
-                      <p className="text-xs text-muted-foreground">
-                        Due {format(new Date(t.due_at), "MMM d, h:mm a")}
-                      </p>
-                    )}
+            <div className="space-y-2.5">
+              {filtered.map((t) => {
+                const isDone = t.status === "done";
+                return (
+                  <div
+                    key={t.id}
+                    className={`flex items-center justify-between p-3.5 rounded-xl border transition-all group ${
+                      isDone
+                        ? "bg-[#131520]/40 border-[#1F2336] text-[#8A8F9E]"
+                        : "bg-[#141624]/90 border-[#202438] text-white hover:border-[#D4AF37]/40"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          toggleM.mutate({ id: t.id, status: isDone ? "todo" : "done" })
+                        }
+                        className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                          isDone
+                            ? "border-[#D4AF37] bg-[#D4AF37] text-[#050507]"
+                            : "border-[#D4AF37]/50 hover:border-[#D4AF37]"
+                        }`}
+                      >
+                        {isDone && <CheckCircle2 className="h-3.5 w-3.5 fill-current" />}
+                      </button>
+
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-xs font-semibold ${isDone ? "line-through opacity-70" : "text-white"}`}>
+                          {t.title}
+                        </p>
+                        {t.notes && <p className="text-[11px] text-[#8A8F9E] truncate mt-0.5">{t.notes}</p>}
+                        {t.due_at && (
+                          <p className="text-[10px] text-[#A0A5B5] mt-0.5">
+                            Due {format(new Date(t.due_at), "MMM d, HH:mm")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 ml-3">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
+                        t.priority === "high"
+                          ? "bg-red-500/10 text-red-400 border border-red-500/30"
+                          : t.priority === "medium"
+                            ? "bg-amber-500/10 text-amber-300 border border-amber-500/30"
+                            : "bg-[#1F2336] text-[#8A8F9E]"
+                      }`}>
+                        {t.priority}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => delM.mutate(t.id)}
+                        disabled={delM.isPending}
+                        className="p-1 rounded text-[#8A8F9E] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label="Delete task"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
-                  <Badge variant="outline">{t.priority}</Badge>
-                  <Button variant="ghost" size="icon" onClick={() => delM.mutate(t.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
+                );
+              })}
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+
+      </div>
     </div>
   );
 }
@@ -157,36 +223,60 @@ function NewTaskDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2"><Plus className="h-4 w-4" /> New task</Button>
+        <Button className="rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#AA7C11] text-[#050507] font-bold text-xs px-5 py-2 hover:scale-105 transition-all gap-1.5">
+          <Plus className="h-3.5 w-3.5" /> New Task
+        </Button>
       </DialogTrigger>
-      <DialogContent>
-        <DialogHeader><DialogTitle>New task</DialogTitle></DialogHeader>
+      <DialogContent className="bg-[#0F111A] border border-[#D4AF37]/30 text-white rounded-xl">
+        <DialogHeader>
+          <DialogTitle className="text-base font-bold text-[#E5C185]">New Task</DialogTitle>
+        </DialogHeader>
         <form
           onSubmit={(e) => {
             e.preventDefault();
             if (!title.trim()) return;
             m.mutate();
           }}
-          className="space-y-4"
+          className="space-y-4 pt-2"
         >
-          <div className="space-y-2">
-            <Label>Title</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus required />
+          <div className="space-y-1.5">
+            <Label className="text-xs text-[#A0A5B5]">Title</Label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              autoFocus
+              required
+              placeholder="Task title..."
+              className="bg-[#141624] border-[#1F2336] text-xs text-white"
+            />
           </div>
-          <div className="space-y-2">
-            <Label>Notes</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+          <div className="space-y-1.5">
+            <Label className="text-xs text-[#A0A5B5]">Notes</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              placeholder="Optional notes..."
+              className="bg-[#141624] border-[#1F2336] text-xs text-white"
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Due</Label>
-              <Input type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} />
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[#A0A5B5]">Due Date</Label>
+              <Input
+                type="datetime-local"
+                value={due}
+                onChange={(e) => setDue(e.target.value)}
+                className="bg-[#141624] border-[#1F2336] text-xs text-white"
+              />
             </div>
-            <div className="space-y-2">
-              <Label>Priority</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-[#A0A5B5]">Priority</Label>
               <Select value={priority} onValueChange={(v) => setPriority(v as typeof priority)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger className="bg-[#141624] border-[#1F2336] text-xs text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#0F111A] border-[#1F2336] text-white">
                   <SelectItem value="low">Low</SelectItem>
                   <SelectItem value="medium">Medium</SelectItem>
                   <SelectItem value="high">High</SelectItem>
@@ -194,7 +284,13 @@ function NewTaskDialog() {
               </Select>
             </div>
           </div>
-          <Button type="submit" className="w-full" disabled={m.isPending}>Add task</Button>
+          <Button
+            type="submit"
+            className="w-full bg-gradient-to-r from-[#D4AF37] to-[#AA7C11] text-[#050507] font-bold text-xs"
+            disabled={m.isPending}
+          >
+            {m.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save Task"}
+          </Button>
         </form>
       </DialogContent>
     </Dialog>

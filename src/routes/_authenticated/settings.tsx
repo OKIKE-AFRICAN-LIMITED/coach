@@ -2,16 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getGoogleIntegrationStatus, disconnectGoogleIntegration } from "@/lib/google.functions";
-import { Mail, Calendar, CheckCircle2, XCircle, ShieldCheck, Loader2 } from "lucide-react";
+import { Mail, Calendar, CheckCircle2, XCircle, ShieldCheck, Loader2, Settings, User, Bell } from "lucide-react";
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -81,7 +79,7 @@ function SettingsPage() {
     const p = await Notification.requestPermission();
     setPushPerm(p);
     if (p === "granted") {
-      new Notification("Coach is ready", { body: "I'll nudge you about tasks here." });
+      new Notification("Coach Ziri is ready", { body: "I'll nudge you about tasks here." });
     }
   }
 
@@ -107,86 +105,107 @@ function SettingsPage() {
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground text-sm mt-1">Manage profile, integrations, and preferences.</p>
-      </div>
+    <div className="min-h-screen bg-[#050507] text-[#F3F4F6] p-4 sm:p-6 lg:p-8 font-sans selection:bg-[#D4AF37]/30 selection:text-[#F5E0A3]">
+      <div className="max-w-4xl mx-auto space-y-6">
+        
+        {/* Header */}
+        <div className="pb-6 border-b border-[#1F2336]">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2.5">
+            <Settings className="h-6 w-6 text-[#D4AF37]" />
+            Settings & Preferences
+          </h1>
+          <p className="text-sm text-[#8A8F9E] mt-1">Manage profile, integrations, and AI nudge preferences.</p>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Profile</CardTitle>
-          <CardDescription>Your personal identification in Coach.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Display name</Label>
-            <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+        {/* Profile Card */}
+        <div className="bg-[#0F111A] border border-[#1F2336] rounded-xl p-5 sm:p-6 space-y-4 shadow-xl">
+          <div className="flex items-center gap-2 text-sm font-bold text-white border-b border-[#1F2336] pb-3">
+            <User className="h-4 w-4 text-[#D4AF37]" />
+            <span>Profile Identity</span>
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="space-y-1.5 max-w-md">
+            <Label className="text-xs text-[#A0A5B5]">Display Name</Label>
+            <Input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="e.g. Alex Ziri"
+              className="bg-[#141624] border-[#1F2336] text-xs text-white"
+            />
+          </div>
+        </div>
+
+        {/* Google Workspace Card */}
+        <div className="bg-[#0F111A] border border-[#1F2336] rounded-xl p-5 sm:p-6 space-y-4 shadow-xl">
+          <div className="flex items-center justify-between border-b border-[#1F2336] pb-3">
             <div>
-              <CardTitle className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-[#D4AF37]" />
                 Google Workspace Integration
-              </CardTitle>
-              <CardDescription className="mt-1">
-                Connect your Gmail & Google Calendar to allow AI task management, schedule syncing, and email digests.
-              </CardDescription>
+              </h2>
+              <p className="text-xs text-[#8A8F9E] mt-0.5">
+                Connect Gmail & Google Calendar for automated schedule syncing and email digests.
+              </p>
             </div>
+
             {statusLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              <Loader2 className="h-4 w-4 animate-spin text-[#D4AF37]" />
             ) : googleStatus?.connected ? (
-              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 gap-1">
-                <CheckCircle2 className="h-3.5 w-3.5" /> Connected
-              </Badge>
+              <div className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-semibold flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3" /> Connected
+              </div>
             ) : (
-              <Badge variant="outline" className="bg-muted text-muted-foreground gap-1">
-                <XCircle className="h-3.5 w-3.5" /> Not Connected
-              </Badge>
+              <div className="px-2.5 py-0.5 rounded-full bg-[#1F2336] text-[#8A8F9E] text-[10px] font-semibold flex items-center gap-1">
+                <XCircle className="h-3 w-3" /> Not Connected
+              </div>
             )}
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-            <div className="flex items-center gap-2.5 p-3 rounded-lg border bg-card/50">
-              <Calendar className="h-4 w-4 text-blue-500 shrink-0" />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-[#141624] border border-[#1F2336]">
+              <Calendar className="h-4 w-4 text-[#D4AF37] shrink-0" />
               <div>
-                <p className="font-medium text-xs">Google Calendar</p>
-                <p className="text-[11px] text-muted-foreground">List, schedule & manage meetings</p>
+                <p className="font-semibold text-white">Google Calendar</p>
+                <p className="text-[11px] text-[#8A8F9E]">Auto sync meetings & focus blocks</p>
               </div>
             </div>
-            <div className="flex items-center gap-2.5 p-3 rounded-lg border bg-card/50">
-              <Mail className="h-4 w-4 text-red-500 shrink-0" />
+
+            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-[#141624] border border-[#1F2336]">
+              <Mail className="h-4 w-4 text-amber-400 shrink-0" />
               <div>
-                <p className="font-medium text-xs">Gmail Inbox</p>
-                <p className="text-[11px] text-muted-foreground">Search emails & send responses</p>
+                <p className="font-semibold text-white">Gmail Inbox</p>
+                <p className="text-[11px] text-[#8A8F9E]">Digest unread priority threads</p>
               </div>
             </div>
           </div>
 
           {googleStatus?.connected ? (
-            <div className="space-y-3 pt-1">
-              <div className="flex items-center justify-between text-xs text-muted-foreground bg-muted/40 p-2.5 rounded-md">
-                <span className="flex items-center gap-1.5">
-                  <ShieldCheck className="h-4 w-4 text-emerald-500" /> Authorized OAuth 2.0 connection
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between text-xs text-[#8A8F9E] bg-[#141624] p-3 rounded-xl border border-[#1F2336]">
+                <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                  <ShieldCheck className="h-4 w-4" /> Authorized OAuth 2.0 connection
                 </span>
                 {googleStatus.updatedAt && (
                   <span>Connected {format(new Date(googleStatus.updatedAt), "MMM d, yyyy")}</span>
                 )}
               </div>
+
               <div className="flex items-center gap-3">
-                <Button variant="outline" onClick={connectGoogle} disabled={connecting} size="sm">
+                <Button
+                  onClick={connectGoogle}
+                  disabled={connecting}
+                  size="sm"
+                  className="rounded-xl bg-[#141624] border border-[#D4AF37]/30 text-[#E5C185] hover:bg-[#1E2236] text-xs"
+                >
                   {connecting ? "Reconnecting..." : "Reconnect Account"}
                 </Button>
+
                 <Button
                   variant="destructive"
                   size="sm"
                   onClick={() => disconnectMutation.mutate()}
                   disabled={disconnectMutation.isPending}
+                  className="rounded-xl text-xs"
                 >
                   {disconnectMutation.isPending ? "Disconnecting..." : "Disconnect Google Account"}
                 </Button>
@@ -194,48 +213,73 @@ function SettingsPage() {
             </div>
           ) : (
             <div className="pt-2">
-              <Button onClick={connectGoogle} disabled={connecting} className="gap-2">
-                {connecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              <Button onClick={connectGoogle} disabled={connecting} className="rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#AA7C11] text-[#050507] font-bold text-xs">
+                {connecting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Mail className="h-3.5 w-3.5 mr-1.5" />}
                 Connect Google Account
               </Button>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Notifications</CardTitle>
-          <CardDescription>Configure reminders and nudge preferences.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Daily nudge time</Label>
-            <Input type="time" value={pushTime} onChange={(e) => setPushTime(e.target.value)} />
-            <p className="text-xs text-muted-foreground">
-              While Coach is open in this browser, you'll get a notification at this time with your day's summary.
-            </p>
+        {/* Notifications Card */}
+        <div className="bg-[#0F111A] border border-[#1F2336] rounded-xl p-5 sm:p-6 space-y-4 shadow-xl">
+          <div className="flex items-center gap-2 text-sm font-bold text-white border-b border-[#1F2336] pb-3">
+            <Bell className="h-4 w-4 text-[#D4AF37]" />
+            <span>Notifications & AI Nudge</span>
           </div>
-          <div className="flex items-center justify-between gap-3 pt-2">
-            <div>
-              <Label>Browser notifications</Label>
-              <p className="text-xs text-muted-foreground">Permission: {pushPerm}</p>
-            </div>
-            <Button variant="outline" onClick={requestPush} disabled={pushPerm === "granted"}>
-              {pushPerm === "granted" ? "Enabled" : "Enable"}
-            </Button>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <Label>Email reminders</Label>
-              <p className="text-xs text-muted-foreground">Daily task digest sent directly to your connected email inbox.</p>
-            </div>
-            <Switch checked={emailEnabled} onCheckedChange={setEmailEnabled} />
-          </div>
-        </CardContent>
-      </Card>
 
-      <Button onClick={save} disabled={saving}>{saving ? "Saving..." : "Save Settings"}</Button>
+          <div className="space-y-4">
+            <div className="space-y-1.5 max-w-md">
+              <Label className="text-xs text-[#A0A5B5]">Daily Nudge Time</Label>
+              <Input
+                type="time"
+                value={pushTime}
+                onChange={(e) => setPushTime(e.target.value)}
+                className="bg-[#141624] border-[#1F2336] text-xs text-white"
+              />
+              <p className="text-[11px] text-[#8A8F9E]">
+                Coach Ziri will deliver your priority briefing at this time.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-2 border-t border-[#1F2336]">
+              <div>
+                <Label className="text-xs text-white font-medium">Browser Notifications</Label>
+                <p className="text-[11px] text-[#8A8F9E]">Permission status: {pushPerm}</p>
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={requestPush}
+                disabled={pushPerm === "granted"}
+                className="rounded-xl border-[#1F2336] text-xs text-[#E5C185]"
+              >
+                {pushPerm === "granted" ? "Enabled" : "Enable"}
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-2 border-t border-[#1F2336]">
+              <div>
+                <Label className="text-xs text-white font-medium">Email Reminders</Label>
+                <p className="text-[11px] text-[#8A8F9E]">Daily priority digest delivered to your inbox.</p>
+              </div>
+
+              <Switch checked={emailEnabled} onCheckedChange={setEmailEnabled} />
+            </div>
+          </div>
+        </div>
+
+        {/* Save Button */}
+        <Button
+          onClick={save}
+          disabled={saving}
+          className="rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#AA7C11] text-[#050507] font-bold text-xs px-6 py-2.5 hover:scale-105 transition-all"
+        >
+          {saving ? "Saving..." : "Save Settings"}
+        </Button>
+
+      </div>
     </div>
   );
 }

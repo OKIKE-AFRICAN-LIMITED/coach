@@ -661,14 +661,12 @@ function Chat({
               icon={
                 <img
                   src="/logo.png"
-                  alt="Alice Logo"
-                  width={64}
-                  height={64}
-                  className="h-16 w-16"
+                  alt="Coach Ziri Logo"
+                  className="h-14 w-auto object-contain drop-shadow-[0_0_15px_rgba(212,175,55,0.3)]"
                 />
               }
-              title="Hi, I'm Alice"
-              description="Talk or type. I can manage tasks, search the web, check your calendar, and send emails."
+              title="Hi, I'm Coach Ziri"
+              description="Talk or type. I can manage your tasks, analyze your day, check your calendar, and coordinate your schedule."
             />
           ) : (
             messages.map((m) => (

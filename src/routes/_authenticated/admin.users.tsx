@@ -2,10 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listUsers, toggleUserAdmin } from "@/lib/admin.functions";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Shield, ShieldOff, Search, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Shield, ShieldOff, Search, Loader2, Users, UserCheck } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -27,119 +26,127 @@ function AdminUsersPage() {
 
   const toggleAdminMutation = useMutation({
     mutationFn: (userId: string) => toggleAdminFn({ data: { userId } }),
-    onSuccess: (res, variables) => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       toast.success(res.newStatus ? "User promoted to admin" : "Admin privileges revoked");
     },
     onError: (err) => {
-      toast.error(err.message || "Failed to update user");
-    }
+      toast.error(err.message || "Failed to update user role");
+    },
   });
 
-  const filteredUsers = users?.filter(u => 
-    (u.display_name?.toLowerCase().includes(searchTerm.toLowerCase())) || 
+  const filteredUsers = users?.filter((u) =>
+    (u.display_name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (u.id.includes(searchTerm))
   ) || [];
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-6">
+      
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-[#1F2336]">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
-          <p className="text-muted-foreground mt-1">Manage user roles and privileges across the platform.</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
+            <Users className="h-6 w-6 text-[#D4AF37]" />
+            User Control & Permissions
+          </h1>
+          <p className="text-xs text-[#8A8F9E] mt-0.5">Manage user access levels and administrative privileges across the platform.</p>
         </div>
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search by name or ID..." 
-            className="pl-9"
+
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8A8F9E]" />
+          <Input
+            placeholder="Search by name or user ID..."
+            className="pl-9 bg-[#0F111A] border-[#1F2336] text-xs text-white placeholder:text-[#6C7180] focus:border-[#D4AF37]"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Registered Users</CardTitle>
-          <CardDescription>A complete list of all users on the platform.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="py-12 flex justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              No users found matching your search.
-            </div>
-          ) : (
-            <div className="rounded-md border overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-muted/50 border-b">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">Name</th>
-                    <th className="px-4 py-3 font-medium">User ID</th>
-                    <th className="px-4 py-3 font-medium">Joined</th>
-                    <th className="px-4 py-3 font-medium">Role</th>
-                    <th className="px-4 py-3 font-medium text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filteredUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-muted/20">
-                      <td className="px-4 py-3 font-medium">
-                        {user.display_name || "Unknown User"}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                        {user.id}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {format(new Date(user.created_at), "MMM d, yyyy")}
-                      </td>
-                      <td className="px-4 py-3">
+      {/* Users Table Card */}
+      <div className="bg-[#0F111A] border border-[#1F2336] rounded-xl p-5 shadow-xl space-y-4">
+        
+        <div className="flex items-center justify-between border-b border-[#1F2336] pb-3">
+          <h2 className="text-xs font-bold text-white uppercase tracking-wider">REGISTERED PLATFORM ACCOUNTS</h2>
+          <span className="text-[11px] font-mono text-[#D4AF37]">{filteredUsers.length} users listed</span>
+        </div>
+
+        {isLoading ? (
+          <div className="py-12 flex flex-col items-center justify-center text-xs text-[#8A8F9E] space-y-2">
+            <Loader2 className="h-5 w-5 animate-spin text-[#D4AF37]" />
+            <p>Loading user directory...</p>
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="py-12 text-center text-xs text-[#8A8F9E]">
+            No users found matching your search.
+          </div>
+        ) : (
+          <div className="rounded-xl border border-[#1F2336] overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-[#141624] border-b border-[#1F2336] text-[#8A8F9E]">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">User Name</th>
+                  <th className="px-4 py-3 font-semibold">User ID</th>
+                  <th className="px-4 py-3 font-semibold">Joined Date</th>
+                  <th className="px-4 py-3 font-semibold">Role</th>
+                  <th className="px-4 py-3 font-semibold text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#1F2336]">
+                {filteredUsers.map((user) => (
+                  <tr key={user.id} className="hover:bg-[#141624]/60 transition-colors">
+                    <td className="px-4 py-3.5 font-bold text-white">
+                      {user.display_name || "Member User"}
+                    </td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] text-[#8A8F9E]">
+                      {user.id}
+                    </td>
+                    <td className="px-4 py-3.5 text-[#D1D5DB]">
+                      {format(new Date(user.created_at), "MMM d, yyyy")}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      {user.is_admin ? (
+                        <span className="px-2.5 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#E5C185] border border-[#D4AF37]/30 text-[10px] font-extrabold uppercase tracking-wider">
+                          Admin
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full bg-[#141624] text-[#8A8F9E] border border-[#1F2336] text-[10px] font-semibold uppercase tracking-wider">
+                          User
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm(`Are you sure you want to ${user.is_admin ? 'revoke' : 'grant'} admin privileges for ${user.display_name || 'this user'}?`)) {
+                            toggleAdminMutation.mutate(user.id);
+                          }
+                        }}
+                        disabled={toggleAdminMutation.isPending && toggleAdminMutation.variables === user.id}
+                        className="rounded-xl hover:bg-[#1C2030] text-xs font-semibold"
+                      >
                         {user.is_admin ? (
-                          <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-primary/10 text-primary border-primary/20">
-                            Admin
+                          <span className="text-rose-400 flex items-center gap-1.5">
+                            <ShieldOff className="h-3.5 w-3.5" /> Revoke Admin
                           </span>
                         ) : (
-                          <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
-                            User
+                          <span className="text-emerald-400 flex items-center gap-1.5">
+                            <Shield className="h-3.5 w-3.5" /> Make Admin
                           </span>
                         )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => {
-                            if(confirm(`Are you sure you want to ${user.is_admin ? 'revoke' : 'grant'} admin privileges for ${user.display_name || 'this user'}?`)) {
-                              toggleAdminMutation.mutate(user.id);
-                            }
-                          }}
-                          disabled={toggleAdminMutation.isPending && toggleAdminMutation.variables === user.id}
-                        >
-                          {user.is_admin ? (
-                            <>
-                              <ShieldOff className="mr-2 h-4 w-4 text-destructive" />
-                              <span className="text-destructive">Revoke Admin</span>
-                            </>
-                          ) : (
-                            <>
-                              <Shield className="mr-2 h-4 w-4 text-emerald-500" />
-                              <span>Make Admin</span>
-                            </>
-                          )}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
