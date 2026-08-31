@@ -76,9 +76,9 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-[#D4AF37]/15 bg-[#050507] text-[#F3F4F6] h-screen shrink-0 rounded-none border-l-0 border-t-0 border-b-0">
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground h-screen shrink-0 rounded-none border-l-0 border-t-0 border-b-0">
       {/* Brand Header - Exactly h-16 (64px) to align with TopBar */}
-      <SidebarHeader className="h-16 border-b border-[#D4AF37]/15 px-4 flex items-center justify-between shrink-0 bg-[#050507] group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+      <SidebarHeader className="h-16 border-b border-sidebar-border px-4 flex items-center justify-between shrink-0 bg-sidebar group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
         <Link to="/dashboard" className="flex items-center gap-3">
           <img
             src="/logo.png"

@@ -34,11 +34,6 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -49,75 +44,74 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-:root {
+/* ==========================================================================
+   DEFAULT / LIGHT THEME DESIGN TOKENS
+   Warm porcelain ivory background with crisp white surfaces & dark charcoal text
+   ========================================================================== */
+:root, .light, html.light {
   --radius: 0.625rem;
-  --background: oklch(0.12 0.02 75);
-  --foreground: oklch(0.96 0.02 85);
-  --card: oklch(0.16 0.02 75);
-  --card-foreground: oklch(0.96 0.02 85);
-  --popover: oklch(0.16 0.02 75);
-  --popover-foreground: oklch(0.96 0.02 85);
-  --primary: oklch(0.78 0.17 75);
-  --primary-foreground: oklch(0.10 0.02 75);
-  --secondary: oklch(0.22 0.03 75);
-  --secondary-foreground: oklch(0.92 0.08 85);
-  --muted: oklch(0.20 0.02 75);
-  --muted-foreground: oklch(0.68 0.04 85);
-  --accent: oklch(0.24 0.04 75);
-  --accent-foreground: oklch(0.92 0.08 85);
-  --destructive: oklch(0.58 0.22 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.78 0.17 75 / 0.22);
-  --input: oklch(0.78 0.17 75 / 0.25);
-  --ring: oklch(0.78 0.17 75);
-  --chart-1: oklch(0.78 0.17 75);
-  --chart-2: oklch(0.68 0.15 65);
-  --chart-3: oklch(0.85 0.18 85);
-  --chart-4: oklch(0.60 0.12 55);
-  --chart-5: oklch(0.90 0.19 90);
-  --sidebar: oklch(0.10 0.02 75);
-  --sidebar-foreground: oklch(0.94 0.02 85);
-  --sidebar-primary: oklch(0.78 0.17 75);
-  --sidebar-primary-foreground: oklch(0.10 0.02 75);
-  --sidebar-accent: oklch(0.78 0.17 75 / 0.15);
-  --sidebar-accent-foreground: oklch(0.92 0.08 85);
-  --sidebar-border: oklch(0.78 0.17 75 / 0.2);
-  --sidebar-ring: oklch(0.78 0.17 75);
+  --background: #F7F6F2;
+  --foreground: #18181B;
+  --card: #FFFFFF;
+  --card-foreground: #18181B;
+  --popover: #FFFFFF;
+  --popover-foreground: #18181B;
+  --primary: #B8860B;
+  --primary-foreground: #050507;
+  --secondary: #EFECE6;
+  --secondary-foreground: #18181B;
+  --muted: #F0ECE1;
+  --muted-foreground: #52525B;
+  --accent: #EBE6DB;
+  --accent-foreground: #18181B;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --border: #E4E1D8;
+  --input: #FFFFFF;
+  --ring: #B8860B;
+  --sidebar: #FCFBF8;
+  --sidebar-foreground: #27272A;
+  --sidebar-primary: #B8860B;
+  --sidebar-primary-foreground: #050507;
+  --sidebar-accent: rgba(184, 134, 11, 0.12);
+  --sidebar-accent-foreground: #18181B;
+  --sidebar-border: #E5E1D8;
+  --sidebar-ring: #B8860B;
 }
 
-.dark {
-  --background: oklch(0.12 0.02 75);
-  --foreground: oklch(0.96 0.02 85);
-  --card: oklch(0.16 0.02 75);
-  --card-foreground: oklch(0.96 0.02 85);
-  --popover: oklch(0.16 0.02 75);
-  --popover-foreground: oklch(0.96 0.02 85);
-  --primary: oklch(0.78 0.17 75);
-  --primary-foreground: oklch(0.10 0.02 75);
-  --secondary: oklch(0.22 0.03 75);
-  --secondary-foreground: oklch(0.92 0.08 85);
-  --muted: oklch(0.20 0.02 75);
-  --muted-foreground: oklch(0.68 0.04 85);
-  --accent: oklch(0.24 0.04 75);
-  --accent-foreground: oklch(0.92 0.08 85);
-  --destructive: oklch(0.58 0.22 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.78 0.17 75 / 0.22);
-  --input: oklch(0.78 0.17 75 / 0.25);
-  --ring: oklch(0.78 0.17 75);
-  --chart-1: oklch(0.78 0.17 75);
-  --chart-2: oklch(0.68 0.15 65);
-  --chart-3: oklch(0.85 0.18 85);
-  --chart-4: oklch(0.60 0.12 55);
-  --chart-5: oklch(0.90 0.19 90);
-  --sidebar: oklch(0.10 0.02 75);
-  --sidebar-foreground: oklch(0.94 0.02 85);
-  --sidebar-primary: oklch(0.78 0.17 75);
-  --sidebar-primary-foreground: oklch(0.10 0.02 75);
-  --sidebar-accent: oklch(0.78 0.17 75 / 0.15);
-  --sidebar-accent-foreground: oklch(0.92 0.08 85);
-  --sidebar-border: oklch(0.78 0.17 75 / 0.2);
-  --sidebar-ring: oklch(0.78 0.17 75);
+/* ==========================================================================
+   DARK THEME DESIGN TOKENS
+   Deep obsidian black background with charcoal cards & champagne gold accents
+   ========================================================================== */
+.dark, html.dark {
+  --radius: 0.625rem;
+  --background: #050507;
+  --foreground: #F5F5F5;
+  --card: #0F111A;
+  --card-foreground: #F5F5F5;
+  --popover: #0F111A;
+  --popover-foreground: #F5F5F5;
+  --primary: #D4AF37;
+  --primary-foreground: #050507;
+  --secondary: #141624;
+  --secondary-foreground: #E5C185;
+  --muted: #181A26;
+  --muted-foreground: #8A8F9E;
+  --accent: #1A1D2B;
+  --accent-foreground: #F5F5F5;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --border: #1F2336;
+  --input: #141624;
+  --ring: #D4AF37;
+  --sidebar: #07080C;
+  --sidebar-foreground: #F3F4F6;
+  --sidebar-primary: #D4AF37;
+  --sidebar-primary-foreground: #050507;
+  --sidebar-accent: rgba(212, 175, 55, 0.15);
+  --sidebar-accent-foreground: #F5E0A3;
+  --sidebar-border: rgba(212, 175, 55, 0.15);
+  --sidebar-ring: #D4AF37;
 }
 
 @layer base {
@@ -129,10 +123,141 @@
     height: 100%;
     width: 100%;
     overflow: hidden;
-    background-color: #050507;
+    background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: 'Inter', sans-serif;
   }
+}
+
+/* ==========================================================================
+   COMPREHENSIVE LIGHT THEME OVERRIDES FOR EXISTING HARDCODED TAILWIND TOKENS
+   Ensures 100% flawless contrast across both Dashboard and Landing Page
+   ========================================================================== */
+html.light, html.light body {
+  background-color: #F7F6F2 !important;
+  color: #18181B !important;
+}
+
+/* Background mappings */
+html.light .bg-\[\#050507\],
+html.light .bg-\[\#040406\] {
+  background-color: #F7F6F2 !important;
+}
+
+html.light .bg-\[\#050507\]\/90,
+html.light .app-shell-header {
+  background-color: rgba(252, 251, 248, 0.92) !important;
+  color: #18181B !important;
+}
+
+html.light .bg-\[\#07080C\],
+html.light .bg-\[\#080910\],
+html.light .bg-\[\#0A0C14\],
+html.light .bg-\[\#0E101A\] {
+  background-color: #FCFBF8 !important;
+}
+
+html.light .bg-\[\#090A10\],
+html.light .bg-\[\#0B0D16\],
+html.light .bg-\[\#0B0D16\]\/90,
+html.light .bg-\[\#0F111A\],
+html.light .bg-\[\#141624\] {
+  background-color: #FFFFFF !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .bg-\[\#131520\]\/40,
+html.light .bg-\[\#141624\]\/90,
+html.light .bg-\[\#141624\]\/80 {
+  background-color: #FAF8F5 !important;
+}
+
+html.light .bg-\[\#1A1810\] {
+  background-color: #F2EDE4 !important;
+}
+
+html.light .bg-secondary {
+  background-color: #EFECE6 !important;
+  color: #18181B !important;
+}
+
+html.light .text-secondary-foreground {
+  color: #18181B !important;
+}
+
+/* Border mappings */
+html.light .border-\[\#1F2336\],
+html.light .border-\[\#1F2336\]\/60,
+html.light .border-\[\#1F2336\]\/40,
+html.light .border-\[\#202438\],
+html.light .border-\[\#1A1D2B\]\/60 {
+  border-color: #E4E1D8 !important;
+}
+
+html.light .border-\[\#D4AF37\]\/15,
+html.light .border-\[\#D4AF37\]\/20,
+html.light .border-\[\#D4AF37\]\/25,
+html.light .border-\[\#D4AF37\]\/30,
+html.light .border-\[\#D4AF37\]\/40,
+html.light .border-\[\#D4AF37\]\/50 {
+  border-color: rgba(184, 134, 11, 0.3) !important;
+}
+
+/* Text color mappings */
+html.light .text-white {
+  color: #18181B !important;
+}
+
+html.light .text-\[\#F3F4F6\],
+html.light .text-\[\#F5F5F5\],
+html.light .text-\[\#D1D5DB\],
+html.light .text-\[\#C8CBD9\] {
+  color: #27272A !important;
+}
+
+html.light .text-\[\#8A8F9E\],
+html.light .text-\[\#A0A5B5\],
+html.light .text-\[\#6C7180\],
+html.light .text-muted-foreground {
+  color: #52525B !important;
+}
+
+html.light .text-\[\#E5C185\],
+html.light .text-\[\#F5E0A3\],
+html.light .text-\[\#D4AF37\] {
+  color: #B8860B !important;
+}
+
+/* AI Chat & Markdown message high contrast in Light Mode */
+html.light [data-slot="conversation-response"],
+html.light [data-slot="conversation-response"] p,
+html.light [data-slot="conversation-response"] li,
+html.light [data-slot="conversation-response"] span,
+html.light .streamdown,
+html.light .streamdown p {
+  color: #18181B !important;
+}
+
+/* Inputs, Textareas, Selects & Toolbars in Light Mode */
+html.light input,
+html.light textarea,
+html.light select {
+  background-color: #FFFFFF !important;
+  color: #18181B !important;
+  border-color: #DDD9CE !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #8A877F !important;
+}
+
+/* Tool Execution Box in Chat */
+html.light [data-slot="tool-header"],
+html.light [data-slot="tool-content"] {
+  background-color: #FFFFFF !important;
+  border-color: #E4E1D8 !important;
+  color: #18181B !important;
 }
 
 /* Custom Subtle 4px Scrollbar Rules */
@@ -145,18 +270,34 @@
   background: transparent;
 }
 
-::-webkit-scrollbar-thumb {
+html.dark ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.12);
   border-radius: 999px;
 }
 
-::-webkit-scrollbar-thumb:hover {
+html.dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(212, 175, 55, 0.35);
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.16);
+  border-radius: 999px;
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(184, 134, 11, 0.45);
 }
 
 * {
   scrollbar-width: thin;
+}
+
+html.dark * {
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+html.light * {
+  scrollbar-color: rgba(0, 0, 0, 0.16) transparent;
 }
 
 @layer utilities {

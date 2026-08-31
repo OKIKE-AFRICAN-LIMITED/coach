@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const Route = createFileRoute("/terms-of-service")({
   component: TermsOfService,
@@ -8,74 +9,94 @@ export const Route = createFileRoute("/terms-of-service")({
 
 function TermsOfService() {
   return (
-    <div className="min-h-screen bg-background text-foreground py-12 px-6 lg:px-12 font-sans">
-      <div className="max-w-3xl mx-auto space-y-8">
-        <Button variant="ghost" asChild className="-ml-4 mb-4">
-          <Link to="/">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Home
-          </Link>
-        </Button>
-        <div className="space-y-4">
-          <h1 className="text-4xl font-extrabold tracking-tight">Terms of Service</h1>
-          <p className="text-muted-foreground">Last Updated: {new Date().toLocaleDateString()}</p>
+    <div className="h-screen w-screen overflow-y-auto overflow-x-hidden bg-[#F7F6F2] dark:bg-[#050507] text-[#18181B] dark:text-[#F3F4F6] font-sans selection:bg-[#D4AF37]/30 selection:text-[#B8860B] dark:selection:text-[#F5E0A3] flex flex-col justify-between transition-colors duration-300">
+      
+      {/* Background Subtle Radial Ambient Glows */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute top-[-15%] left-[50%] -translate-x-1/2 w-[70vw] h-[40vh] rounded-full bg-[#D4AF37]/10 dark:bg-[#D4AF37]/5 blur-[160px]" />
+      </div>
+
+      {/* Top Navbar */}
+      <header className="relative z-50 w-full px-6 lg:px-16 py-6 flex items-center justify-between max-w-7xl mx-auto border-b border-[#E4E1D8] dark:border-[#1F2336]/60">
+        <Link to="/" className="flex items-center gap-3">
+          <img
+            src="/logo.png"
+            alt="Coach Ziri Logo"
+            className="h-9 w-auto object-contain drop-shadow-[0_0_15px_rgba(212,175,55,0.3)]"
+          />
+        </Link>
+        <div className="flex items-center gap-4">
+          <ThemeToggle />
+          <Button variant="ghost" asChild size="sm" className="text-xs font-semibold">
+            <Link to="/">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Home
+            </Link>
+          </Button>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="relative z-10 max-w-4xl mx-auto px-6 py-12 space-y-8 flex-1 w-full">
+        <div className="space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white dark:bg-[#141624] border border-[#D4AF37]/30 text-[10px] font-bold text-[#B8860B] dark:text-[#E5C185] uppercase tracking-widest shadow-sm">
+            <FileText className="h-3.5 w-3.5 text-[#B8860B] dark:text-[#D4AF37]" />
+            User Agreement
+          </div>
+          <h1 className="text-3xl sm:text-5xl font-serif text-[#18181B] dark:text-white tracking-tight">
+            Terms of Service
+          </h1>
+          <p className="text-xs sm:text-sm text-[#52525B] dark:text-[#8A8F9E]">
+            Last Updated: {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+          </p>
         </div>
 
-        <div className="prose prose-slate dark:prose-invert max-w-none space-y-6">
+        <div className="p-8 rounded-2xl bg-white dark:bg-[#090A10] border border-[#E4E1D8] dark:border-[#1F2336] shadow-xl dark:shadow-none space-y-6 text-sm text-[#27272A] dark:text-[#D1D5DB] leading-relaxed">
           <p>
-            Please read these terms of service ("Terms", "Terms of Service") carefully before using the Okikes Coach application (the "Service") operated by Okikes Enterprises ("us", "we", or "our").
+            Please read these terms of service ("Terms", "Terms of Service") carefully before using the <strong>Coach Ziri</strong> platform (operated by <strong>Okikes Enterprises</strong>, "us", "we", or "our").
           </p>
 
-          <h2 className="text-2xl font-bold mt-8">1. Acceptance of Terms</h2>
+          <h2 className="text-xl font-bold text-[#18181B] dark:text-white pt-4">1. Acceptance of Terms</h2>
           <p>
-            By accessing or using our Service, you agree to be bound by these Terms. If you disagree with any part of the terms then you may not access the Service.
+            By accessing or creating an account on our platform, you agree to be bound by these Terms. If you disagree with any part of the terms, you may not access the Service.
           </p>
 
-          <h2 className="text-2xl font-bold mt-8">2. Description of Service</h2>
+          <h2 className="text-xl font-bold text-[#18181B] dark:text-white pt-4">2. Description of Service</h2>
           <p>
-            Okikes Coach is an AI-powered personal task management and productivity application. We provide tools to help users organize tasks, track daily habits, manage schedules via Google Calendar integration, interact with Gmail, and converse with an intelligent AI coach.
+            Coach Ziri provides AI-powered task prioritization, voice-enabled assistant coaching, Google Calendar &amp; Gmail integrations, focus time defense, and automated productivity tracking.
           </p>
 
-          <h2 className="text-2xl font-bold mt-8">3. Accounts & Security</h2>
+          <h2 className="text-xl font-bold text-[#18181B] dark:text-white pt-4">3. Google API Integration &amp; Permissions</h2>
           <p>
-            When you create an account with us, you must provide accurate and complete information. You are responsible for safeguarding your credentials and for all activities that occur under your account.
+            Our Service provides optional integrations with Google Workspace APIs. By authorizing Google Workspace connections:
           </p>
-
-          <h2 className="text-2xl font-bold mt-8">4. Google API Integration & Permissions</h2>
-          <p>
-            Our Service allows optional integration with Google APIs (Gmail and Google Calendar). By authorizing this integration:
-          </p>
-          <ul className="list-disc pl-6 space-y-2">
-            <li>You grant Okikes Coach permission to access your Google account data strictly as described in our <Link to="/privacy-policy" className="text-primary underline font-medium">Privacy Policy</Link>.</li>
-            <li>You acknowledge that our access is subject to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer" className="text-primary underline">Google API Services User Data Policy</a>.</li>
-            <li>You can revoke access at any time through your in-app Settings or your Google Account security settings.</li>
+          <ul className="list-disc pl-6 space-y-1.5 text-xs sm:text-sm text-[#52525B] dark:text-[#A0A5B5]">
+            <li>You grant Coach Ziri permission to access your Google account data strictly as described in our <Link to="/privacy-policy" className="text-[#B8860B] dark:text-[#D4AF37] underline font-medium">Privacy Policy</Link>.</li>
+            <li>You acknowledge that our access adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer" className="text-[#B8860B] dark:text-[#D4AF37] underline font-medium">Google API Services User Data Policy</a>.</li>
+            <li>You can revoke access at any time through your in-app Settings or Google Account security controls.</li>
           </ul>
 
-          <h2 className="text-2xl font-bold mt-8">5. User Conduct & Acceptable Use</h2>
+          <h2 className="text-xl font-bold text-[#18181B] dark:text-white pt-4">4. Intellectual Property</h2>
           <p>
-            You agree not to misuse the Service, send spam via email integrations, perform automated scraping, or attempt unauthorized access to other users' accounts or data.
+            The Coach Ziri application, including AI orchestration models, algorithms, branding, and interfaces, remains the exclusive property of Okikes Enterprises and its licensors.
           </p>
 
-          <h2 className="text-2xl font-bold mt-8">6. Intellectual Property</h2>
+          <h2 className="text-xl font-bold text-[#18181B] dark:text-white pt-4">5. Contact &amp; Support</h2>
           <p>
-            The Service and its original content, features, and functionality are and will remain the exclusive property of Okikes Enterprises and its licensors.
-          </p>
-
-          <h2 className="text-2xl font-bold mt-8">7. Limitation of Liability</h2>
-          <p>
-            In no event shall Okikes Enterprises, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages resulting from your access to or use of or inability to access or use the Service.
-          </p>
-
-          <h2 className="text-2xl font-bold mt-8">8. Changes to Terms</h2>
-          <p>
-            We reserve the right to modify or replace these Terms at any time. Continued use of the Service following changes constitutes acceptance of the new Terms.
-          </p>
-
-          <h2 className="text-2xl font-bold mt-8">9. Contact Us</h2>
-          <p>
-            If you have any questions about these Terms, please contact us at: <strong>okikeenterprises@gmail.com</strong>.
+            If you have questions regarding these Terms, please contact us at:{" "}
+            <strong className="text-[#B8860B] dark:text-[#E5C185]">okikeenterprises@gmail.com</strong>.
           </p>
         </div>
-      </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="relative z-10 w-full border-t border-[#E4E1D8] dark:border-[#1F2336]/60 py-6 px-6 lg:px-16 max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#52525B] dark:text-[#6C7180]">
+        <p>© 2026 Coach Ziri. All rights reserved.</p>
+        <div className="inline-flex items-center gap-2.5 px-3 py-1 rounded-xl bg-white text-black shadow-sm border border-[#E4E1D8] dark:border-white/20">
+          <span className="text-[10px] uppercase tracking-widest text-[#52525B] font-bold">Powered by</span>
+          <img src="/sponsor/Asset 41.png" alt="OKIKE" className="h-4 w-auto object-contain" />
+        </div>
+      </footer>
+
     </div>
   );
 }

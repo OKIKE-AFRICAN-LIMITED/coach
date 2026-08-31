@@ -213,7 +213,7 @@ function VoiceVisualizer({
     statusBadge = "Processing";
     badgeColor = "bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30";
   } else if (callState === "speaking") {
-    statusText = "Alice speaking";
+    statusText = "Coach Ziri speaking";
     statusBadge = "Audio Output";
     badgeColor = "bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/30";
   }
@@ -754,11 +754,11 @@ function Chat({
                 ? "Listening…"
                 : callActive
                   ? callState === "speaking"
-                    ? "Alice is speaking…"
+                    ? "Coach Ziri is speaking…"
                     : callState === "thinking"
                       ? "Thinking…"
                       : "Listening…"
-                  : "Type or tap the mic to talk to Alice…"
+                  : "Type or tap the mic to talk to Coach Ziri…"
             }
           />
           <PromptInputFooter className="justify-between">
@@ -789,7 +789,7 @@ function Chat({
                   if (voiceOn) audioRef.current?.pause();
                   setVoiceOn((v) => !v);
                 }}
-                aria-label={voiceOn ? "Mute Alice's voice" : "Unmute Alice's voice"}
+                aria-label={voiceOn ? "Mute Coach Ziri's voice" : "Unmute Coach Ziri's voice"}
                 title={voiceOn ? "Voice on — click to mute" : "Voice muted — click to unmute"}
               >
                 {voiceOn ? (
@@ -806,8 +806,8 @@ function Chat({
                 variant={callActive ? "destructive" : "ghost"}
                 onClick={callActive ? stopCall : startCall}
                 disabled={recording}
-                aria-label={callActive ? "End call" : "Start voice call with Alice"}
-                title={callActive ? "End call" : "Start hands-free call with Alice"}
+                aria-label={callActive ? "End call" : "Start voice call with Coach Ziri"}
+                title={callActive ? "End call" : "Start hands-free call with Coach Ziri"}
               >
                 {callActive ? (
                   <PhoneOff className="h-4 w-4" />

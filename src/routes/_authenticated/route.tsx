@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { createThread } from "@/lib/threads.functions";
 import { Search, Bell, Sparkles, User } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -66,7 +67,7 @@ function AuthedLayout() {
         <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden bg-[#050507]">
           
           {/* Top Bar - Exactly h-16 (64px) aligning with Sidebar Header */}
-          <header className="h-16 flex items-center justify-between border-b border-[#D4AF37]/15 px-4 lg:px-6 shrink-0 bg-[#050507]/90 backdrop-blur-md z-20 text-[#E5C185]">
+          <header className="app-shell-header h-16 flex items-center justify-between border-b border-border px-4 lg:px-6 shrink-0 bg-[#FCFBF8]/90 dark:bg-[#050507]/90 backdrop-blur-md z-20 text-[#18181B] dark:text-[#E5C185]">
             <div className="flex items-center gap-3">
               <SidebarTrigger className="hover:bg-[#141624] text-[#A0A5B5] hover:text-[#E5C185]" />
               
@@ -83,6 +84,9 @@ function AuthedLayout() {
 
             {/* Top Bar Actions */}
             <div className="flex items-center gap-3">
+              {/* Theme Toggle (Sun/Moon) */}
+              <ThemeToggle />
+
               <button
                 type="button"
                 className="p-2 rounded-xl text-[#8A8F9E] hover:text-white hover:bg-[#141624] transition-colors relative"
@@ -100,10 +104,10 @@ function AuthedLayout() {
               <Button
                 onClick={() => newChat.mutate()}
                 disabled={newChat.isPending}
-                className="rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#AA7C11] text-[#050507] font-bold text-xs px-4 py-2 shadow-[0_0_20px_rgba(212,175,55,0.2)] hover:scale-105 transition-all gap-1.5"
+                className="rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#AA7C11] text-[#050507] font-bold text-xs px-3 sm:px-4 py-2 shadow-[0_0_20px_rgba(212,175,55,0.2)] hover:scale-105 transition-all gap-1.5 shrink-0"
               >
                 <Sparkles className="h-3.5 w-3.5" />
-                <span>Ask Ziri</span>
+                <span className="hidden sm:inline">Ask Ziri</span>
               </Button>
             </div>
           </header>
