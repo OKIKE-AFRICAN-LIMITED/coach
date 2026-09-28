@@ -28,8 +28,11 @@ import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAutomationsRouteImport } from './routes/_authenticated/automations'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin.route'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as ApiRemindersActionRouteImport } from './routes/api/reminders/action'
 import { Route as ApiPublicTtsRouteImport } from './routes/api/public/tts'
 import { Route as ApiPublicSttRouteImport } from './routes/api/public/stt'
+import { Route as ApiPublicSendRemindersRouteImport } from './routes/api/public/send-reminders'
+import { Route as ApiPublicKeepAliveRouteImport } from './routes/api/public/keep-alive'
 import { Route as AuthenticatedChatThreadIdRouteImport } from './routes/_authenticated/chat.$threadId'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 
@@ -128,6 +131,11 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRouteRoute,
 } as any)
+const ApiRemindersActionRoute = ApiRemindersActionRouteImport.update({
+  id: '/api/reminders/action',
+  path: '/api/reminders/action',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicTtsRoute = ApiPublicTtsRouteImport.update({
   id: '/api/public/tts',
   path: '/api/public/tts',
@@ -136,6 +144,16 @@ const ApiPublicTtsRoute = ApiPublicTtsRouteImport.update({
 const ApiPublicSttRoute = ApiPublicSttRouteImport.update({
   id: '/api/public/stt',
   path: '/api/public/stt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicSendRemindersRoute = ApiPublicSendRemindersRouteImport.update({
+  id: '/api/public/send-reminders',
+  path: '/api/public/send-reminders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicKeepAliveRoute = ApiPublicKeepAliveRouteImport.update({
+  id: '/api/public/keep-alive',
+  path: '/api/public/keep-alive',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedChatThreadIdRoute =
@@ -170,8 +188,11 @@ export interface FileRoutesByFullPath {
   '/api/google-callback': typeof ApiGoogleCallbackRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/chat/$threadId': typeof AuthenticatedChatThreadIdRoute
+  '/api/public/keep-alive': typeof ApiPublicKeepAliveRoute
+  '/api/public/send-reminders': typeof ApiPublicSendRemindersRoute
   '/api/public/stt': typeof ApiPublicSttRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
+  '/api/reminders/action': typeof ApiRemindersActionRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesByTo {
@@ -193,8 +214,11 @@ export interface FileRoutesByTo {
   '/api/google-callback': typeof ApiGoogleCallbackRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/chat/$threadId': typeof AuthenticatedChatThreadIdRoute
+  '/api/public/keep-alive': typeof ApiPublicKeepAliveRoute
+  '/api/public/send-reminders': typeof ApiPublicSendRemindersRoute
   '/api/public/stt': typeof ApiPublicSttRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
+  '/api/reminders/action': typeof ApiRemindersActionRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRoutesById {
@@ -219,8 +243,11 @@ export interface FileRoutesById {
   '/api/google-callback': typeof ApiGoogleCallbackRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/chat/$threadId': typeof AuthenticatedChatThreadIdRoute
+  '/api/public/keep-alive': typeof ApiPublicKeepAliveRoute
+  '/api/public/send-reminders': typeof ApiPublicSendRemindersRoute
   '/api/public/stt': typeof ApiPublicSttRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
+  '/api/reminders/action': typeof ApiRemindersActionRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -245,8 +272,11 @@ export interface FileRouteTypes {
     | '/api/google-callback'
     | '/admin/users'
     | '/chat/$threadId'
+    | '/api/public/keep-alive'
+    | '/api/public/send-reminders'
     | '/api/public/stt'
     | '/api/public/tts'
+    | '/api/reminders/action'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -268,8 +298,11 @@ export interface FileRouteTypes {
     | '/api/google-callback'
     | '/admin/users'
     | '/chat/$threadId'
+    | '/api/public/keep-alive'
+    | '/api/public/send-reminders'
     | '/api/public/stt'
     | '/api/public/tts'
+    | '/api/reminders/action'
     | '/admin'
   id:
     | '__root__'
@@ -293,8 +326,11 @@ export interface FileRouteTypes {
     | '/api/google-callback'
     | '/_authenticated/admin/users'
     | '/_authenticated/chat/$threadId'
+    | '/api/public/keep-alive'
+    | '/api/public/send-reminders'
     | '/api/public/stt'
     | '/api/public/tts'
+    | '/api/reminders/action'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -306,8 +342,11 @@ export interface RootRouteChildren {
   TermsOfServiceRoute: typeof TermsOfServiceRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiGoogleCallbackRoute: typeof ApiGoogleCallbackRoute
+  ApiPublicKeepAliveRoute: typeof ApiPublicKeepAliveRoute
+  ApiPublicSendRemindersRoute: typeof ApiPublicSendRemindersRoute
   ApiPublicSttRoute: typeof ApiPublicSttRoute
   ApiPublicTtsRoute: typeof ApiPublicTtsRoute
+  ApiRemindersActionRoute: typeof ApiRemindersActionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -445,6 +484,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/api/reminders/action': {
+      id: '/api/reminders/action'
+      path: '/api/reminders/action'
+      fullPath: '/api/reminders/action'
+      preLoaderRoute: typeof ApiRemindersActionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/tts': {
       id: '/api/public/tts'
       path: '/api/public/tts'
@@ -457,6 +503,20 @@ declare module '@tanstack/react-router' {
       path: '/api/public/stt'
       fullPath: '/api/public/stt'
       preLoaderRoute: typeof ApiPublicSttRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/send-reminders': {
+      id: '/api/public/send-reminders'
+      path: '/api/public/send-reminders'
+      fullPath: '/api/public/send-reminders'
+      preLoaderRoute: typeof ApiPublicSendRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/keep-alive': {
+      id: '/api/public/keep-alive'
+      path: '/api/public/keep-alive'
+      fullPath: '/api/public/keep-alive'
+      preLoaderRoute: typeof ApiPublicKeepAliveRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/chat/$threadId': {
@@ -542,8 +602,11 @@ const rootRouteChildren: RootRouteChildren = {
   TermsOfServiceRoute: TermsOfServiceRoute,
   ApiChatRoute: ApiChatRoute,
   ApiGoogleCallbackRoute: ApiGoogleCallbackRoute,
+  ApiPublicKeepAliveRoute: ApiPublicKeepAliveRoute,
+  ApiPublicSendRemindersRoute: ApiPublicSendRemindersRoute,
   ApiPublicSttRoute: ApiPublicSttRoute,
   ApiPublicTtsRoute: ApiPublicTtsRoute,
+  ApiRemindersActionRoute: ApiRemindersActionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

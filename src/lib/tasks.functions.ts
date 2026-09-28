@@ -116,3 +116,78 @@ export const getBriefing = createServerFn({ method: "GET" })
       upcoming,
     };
   });
+
+export const savePushSubscription = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: unknown) =>
+    z.object({
+      endpoint: z.string().url(),
+      p256dh: z.string().min(1),
+      auth: z.string().min(1),
+    }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    const { error } = await context.supabase
+      .from("push_subscriptions")
+      .upsert(
+        {
+          user_id: context.userId,
+          endpoint: data.endpoint,
+          p256dh: data.p256dh,
+          auth: data.auth,
+        } as any,
+        { onConflict: "endpoint" }
+      );
+    if (error) {
+      console.error("Failed to save push subscription:", error);
+      throw new Error(error.message);
+    }
+    return { ok: true };
+  });
+
+export const removePushSubscription = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: unknown) => z.object({ endpoint: z.string() }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { error } = await context.supabase
+      .from("push_subscriptions")
+      .delete()
+      .eq("endpoint", data.endpoint)
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const snoozeTaskReminder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: unknown) =>
+    z.object({
+      taskId: z.string().uuid(),
+      minutes: z.number().int().min(1).max(1440).default(5),
+    }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    const newRemindAt = new Date(Date.now() + data.minutes * 60_000).toISOString();
+    const { data: row, error } = await context.supabase
+      .from("tasks")
+      .update({ remind_at: newRemindAt } as any)
+      .eq("id", data.taskId)
+      .eq("user_id", context.userId)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
+  });
+
+export const dismissTaskReminder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: unknown) => z.object({ taskId: z.string().uuid() }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { error } = await context.supabase
+      .from("tasks")
+      .update({ remind_at: null } as any)
+      .eq("id", data.taskId)
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

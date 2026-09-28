@@ -10,7 +10,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { createThread } from "@/lib/threads.functions";
 import { Search, Bell, Sparkles, User } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { useTaskReminders, ALARM_EVENT, snoozeReminder } from "@/hooks/use-task-reminders";
+import { useTaskReminders, ALARM_EVENT, ensurePushSubscribed } from "@/hooks/use-task-reminders";
 import { AlarmOverlay } from "@/components/AlarmOverlay";
 import type { AlarmTask } from "@/components/AlarmOverlay";
 import type { AlarmEventDetail } from "@/hooks/use-task-reminders";
@@ -32,8 +32,8 @@ function AuthedLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isAdminRoute = pathname.startsWith("/admin");
 
-  // Start background task reminder polling
-  useTaskReminders();
+  // Background task reminder polling hook with snooze and dismiss actions
+  const { handleSnooze: hookSnooze, handleDismiss: hookDismiss } = useTaskReminders();
 
   const createT = useServerFn(createThread);
 
@@ -58,6 +58,9 @@ function AuthedLayout() {
     const result = await Notification.requestPermission();
     setNotifPermission(result);
     if (result !== "default") setBannerDismissed(true);
+    if (result === "granted") {
+      await ensurePushSubscribed();
+    }
   }, []);
 
   const dismissBanner = useCallback(() => {
@@ -68,16 +71,36 @@ function AuthedLayout() {
   // Register Service Worker for PWA background notifications
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
-      // Listen for SW messages (e.g. snooze triggered from notification action)
-      navigator.serviceWorker.addEventListener("message", (event) => {
+      navigator.serviceWorker.register("/sw.js", { scope: "/" })
+        .then(() => {
+          if (Notification.permission === "granted") {
+            ensurePushSubscribed().catch(() => {});
+          }
+        })
+        .catch(() => {});
+
+      // Listen for SW messages (snooze/dismiss triggered from native notification actions)
+      const messageHandler = (event: MessageEvent) => {
         if (event.data?.type === "SNOOZE_REMINDER") {
-          snoozeReminder(event.data.taskId, event.data.minutes ?? 5);
-          setAlarmTasks((prev) => prev.filter((t) => t.id !== event.data.taskId));
+          const taskId = event.data.taskId;
+          const mins = event.data.minutes ?? 5;
+          setAlarmTasks((prev) => {
+            const task = prev.find((t) => t.id === taskId) || { id: taskId, title: "Task" };
+            hookSnooze(task, mins);
+            return prev.filter((t) => t.id !== taskId);
+          });
         }
-      });
+        if (event.data?.type === "DISMISS_REMINDER") {
+          const taskId = event.data.taskId;
+          hookDismiss(taskId);
+          setAlarmTasks((prev) => prev.filter((t) => t.id !== taskId));
+        }
+      };
+
+      navigator.serviceWorker.addEventListener("message", messageHandler);
+      return () => navigator.serviceWorker.removeEventListener("message", messageHandler);
     }
-  }, []);
+  }, [hookSnooze, hookDismiss]);
 
   // Listen for in-app alarm events from the polling hook
   useEffect(() => {
@@ -94,17 +117,19 @@ function AuthedLayout() {
   }, []);
 
   const handleDismiss = useCallback((taskId: string) => {
+    hookDismiss(taskId);
     setAlarmTasks((prev) => prev.filter((t) => t.id !== taskId));
-  }, []);
+  }, [hookDismiss]);
 
   const handleDismissAll = useCallback(() => {
+    alarmTasks.forEach((t) => hookDismiss(t.id));
     setAlarmTasks([]);
-  }, []);
+  }, [alarmTasks, hookDismiss]);
 
-  const handleSnooze = useCallback((taskId: string, minutes: number) => {
-    snoozeReminder(taskId, minutes);
-    setAlarmTasks((prev) => prev.filter((t) => t.id !== taskId));
-  }, []);
+  const handleSnooze = useCallback((task: AlarmTask, minutes: number) => {
+    hookSnooze(task, minutes);
+    setAlarmTasks((prev) => prev.filter((t) => t.id !== task.id));
+  }, [hookSnooze]);
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
