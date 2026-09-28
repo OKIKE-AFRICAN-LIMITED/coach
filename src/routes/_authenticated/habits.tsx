@@ -219,7 +219,7 @@ function HabitsPage() {
                               date: d.dateStr, 
                               completed: !isCompleted 
                             })}
-                            className={`w-[26px] h-[26px] sm:w-7 sm:h-7 rounded-lg text-[10px] font-medium flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 ${bgColor}`}
+                            className={`w-6 h-6 sm:w-[26px] sm:h-[26px] rounded-md text-[10px] font-medium flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 ${bgColor}`}
                           >
                             {d.day}
                           </button>

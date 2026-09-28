@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, CheckCircle2, Clock, Filter as FilterIcon, CheckSquare, Loader2 } from "lucide-react";
+import { Plus, Trash2, CheckCircle2, Clock, Filter as FilterIcon, CheckSquare, Loader2, Bell } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -154,6 +154,12 @@ function TasksPage() {
                             Due {format(new Date(t.due_at), "MMM d, HH:mm")}
                           </p>
                         )}
+                        {t.remind_at && (
+                          <p className="text-[10px] text-[#D4AF37]/80 mt-0.5 flex items-center gap-1">
+                            <Bell className="h-2.5 w-2.5" />
+                            Reminder {format(new Date(t.remind_at), "MMM d, HH:mm")}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -195,6 +201,7 @@ function NewTaskDialog() {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [due, setDue] = useState("");
+  const [remindAt, setRemindAt] = useState("");
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
   const qc = useQueryClient();
   const create = useServerFn(createTask);
@@ -206,6 +213,7 @@ function NewTaskDialog() {
           title,
           notes: notes || null,
           due_at: due ? new Date(due).toISOString() : null,
+          remind_at: remindAt ? new Date(remindAt).toISOString() : null,
           priority,
           recurrence: "none",
         },
@@ -214,7 +222,7 @@ function NewTaskDialog() {
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["briefing"] });
       setOpen(false);
-      setTitle(""); setNotes(""); setDue(""); setPriority("medium");
+      setTitle(""); setNotes(""); setDue(""); setRemindAt(""); setPriority("medium");
       toast.success("Task added");
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
@@ -283,6 +291,18 @@ function NewTaskDialog() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-[#A0A5B5] flex items-center gap-1">
+              <Bell className="h-3 w-3 text-[#D4AF37]" /> Remind Me At
+            </Label>
+            <Input
+              type="datetime-local"
+              value={remindAt}
+              onChange={(e) => setRemindAt(e.target.value)}
+              className="bg-[#141624] border-[#1F2336] text-xs text-white"
+            />
+            <p className="text-[10px] text-[#6C7180]">You'll get a notification at this exact time.</p>
           </div>
           <Button
             type="submit"

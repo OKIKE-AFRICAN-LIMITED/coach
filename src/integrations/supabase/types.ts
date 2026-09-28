@@ -171,6 +171,7 @@ export type Database = {
           notes: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           recurrence: Database["public"]["Enums"]["task_recurrence"]
+          remind_at: string | null
           status: Database["public"]["Enums"]["task_status"]
           title: string
           updated_at: string
@@ -184,6 +185,7 @@ export type Database = {
           notes?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           recurrence?: Database["public"]["Enums"]["task_recurrence"]
+          remind_at?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           title: string
           updated_at?: string
@@ -197,6 +199,7 @@ export type Database = {
           notes?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           recurrence?: Database["public"]["Enums"]["task_recurrence"]
+          remind_at?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           title?: string
           updated_at?: string

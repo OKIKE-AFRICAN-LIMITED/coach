@@ -2,6 +2,9 @@
 @source "../src";
 @import "tw-animate-css";
 
+/* Custom xs breakpoint (480px) */
+@custom-variant xs (@media (width >= 480px));
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

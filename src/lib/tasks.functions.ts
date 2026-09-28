@@ -6,6 +6,7 @@ const TaskInput = z.object({
   title: z.string().min(1).max(500),
   notes: z.string().max(5000).optional().nullable(),
   due_at: z.string().datetime().optional().nullable(),
+  remind_at: z.string().datetime().optional().nullable(),
   priority: z.enum(["low", "medium", "high"]).default("medium"),
   recurrence: z.enum(["none", "daily", "weekly"]).default("none"),
 });
@@ -51,6 +52,7 @@ export const updateTask = createServerFn({ method: "POST" })
       title?: string;
       notes?: string | null;
       due_at?: string | null;
+      remind_at?: string | null;
       priority?: "low" | "medium" | "high";
       recurrence?: "none" | "daily" | "weekly";
       status?: "todo" | "done";

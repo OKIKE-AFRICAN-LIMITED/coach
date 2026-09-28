@@ -176,7 +176,7 @@ function SettingsPage() {
 
         {/* Google Workspace Card */}
         <div className="bg-[#0F111A] border border-[#1F2336] rounded-xl p-5 sm:p-6 space-y-4 shadow-xl">
-          <div className="flex items-center justify-between border-b border-[#1F2336] pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1F2336] pb-3">
             <div>
               <h2 className="text-sm font-bold text-white flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-[#D4AF37]" />
@@ -229,7 +229,7 @@ function SettingsPage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <Button
                   onClick={connectGoogle}
                   disabled={connecting}
