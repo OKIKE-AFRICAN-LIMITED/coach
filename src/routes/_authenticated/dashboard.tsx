@@ -108,7 +108,10 @@ function Dashboard() {
   const highPriorityCount = todoTasks.filter((t) => t.priority === "high").length;
 
   const calendarEvents = calendarData?.events ?? [];
-  const todayEvents = calendarEvents.slice(0, 4);
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const upcomingEvents = calendarEvents.filter((e) => !e.start || new Date(e.start) >= startOfToday);
+  const todayEvents = upcomingEvents.slice(0, 4);
 
   // Formatted priorities (top 5 real todo tasks)
   const displayedPriorities = todoTasks.slice(0, 5).map((t, index) => ({
@@ -427,7 +430,7 @@ function Dashboard() {
         )}
 
         {/* Calendar empty state */}
-        {!calendarLoading && todayEvents.length === 0 && (
+        {!calendarLoading && !calendarData?.connected && (
           <div className="bg-[#0F111A] border border-[#1F2336] border-dashed rounded-xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-[#141624] border border-[#1F2336] flex items-center justify-center shrink-0">

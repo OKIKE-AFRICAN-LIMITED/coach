@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getGoogleIntegrationStatus, disconnectGoogleIntegration } from "@/lib/google.functions";
-import { Mail, Calendar, CheckCircle2, XCircle, ShieldCheck, Loader2, Settings, User, Bell } from "lucide-react";
+import { Mail, Calendar, CheckCircle2, XCircle, ShieldCheck, Loader2, Settings, User, Bell, Cpu, Copy } from "lucide-react";
 import { format } from "date-fns";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
@@ -23,6 +23,7 @@ function SettingsPage() {
   const getStatusFn = useServerFn(getGoogleIntegrationStatus);
   const disconnectFn = useServerFn(disconnectGoogleIntegration);
 
+  const [userId, setUserId] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [pushTime, setPushTime] = useState("08:00");
   const [emailEnabled, setEmailEnabled] = useState(false);
@@ -51,6 +52,7 @@ function SettingsPage() {
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return;
+      setUserId(data.user.id);
       const { data: prof } = await supabase.from("profiles").select("*").eq("id", data.user.id).maybeSingle();
       if (prof) {
         setDisplayName(prof.display_name ?? "");
@@ -305,6 +307,63 @@ function SettingsPage() {
               </div>
 
               <Switch checked={emailEnabled} onCheckedChange={setEmailEnabled} />
+            </div>
+          </div>
+        </div>
+
+        {/* OKIKE Multi-Platform Python Engine Card */}
+        <div className="bg-[#0F111A] border border-[#D4AF37]/30 rounded-xl p-5 sm:p-6 space-y-4 shadow-xl">
+          <div className="flex items-center justify-between border-b border-[#1F2336] pb-3">
+            <div className="flex items-center gap-2 text-sm font-bold text-white">
+              <Cpu className="h-4 w-4 text-[#D4AF37]" />
+              <span>OKIKE Multi-Platform Python API</span>
+            </div>
+            <span className="px-2.5 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#E5C185] border border-[#D4AF37]/30 text-[10px] font-semibold">
+              FastAPI v1.0
+            </span>
+          </div>
+
+          <p className="text-xs text-[#8A8F9E] leading-relaxed">
+            Connect your other OKIKE websites, bots, or internal tools to the Python FastAPI Core Engine (<code className="text-[#E5C185]">/backend</code>) using your User ID and <code className="text-[#E5C185]">OKIKE_PLATFORM_API_KEY</code>.
+          </p>
+
+          <div className="space-y-1.5 max-w-lg">
+            <Label className="text-xs text-[#A0A5B5]">Your OKIKE User ID (X-Okike-User-Id)</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                readOnly
+                value={userId || "Loading..."}
+                className="bg-[#141624] border-[#1F2336] text-xs font-mono text-[#E5C185]"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (userId) {
+                    navigator.clipboard.writeText(userId);
+                    toast.success("Copied User ID to clipboard");
+                  }
+                }}
+                className="rounded-xl border-[#1F2336] text-xs text-[#E5C185] shrink-0"
+              >
+                <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px]">
+            <div className="p-3 rounded-xl bg-[#141624] border border-[#1F2336]">
+              <span className="font-mono font-bold text-[#D4AF37] block">POST /v1/agent/chat</span>
+              <span className="text-[#8A8F9E]">Chat & execute tools from any OKIKE platform</span>
+            </div>
+            <div className="p-3 rounded-xl bg-[#141624] border border-[#1F2336]">
+              <span className="font-mono font-bold text-[#D4AF37] block">POST /v1/agent/briefing</span>
+              <span className="text-[#8A8F9E]">Executive daily operations summary</span>
+            </div>
+            <div className="p-3 rounded-xl bg-[#141624] border border-[#1F2336]">
+              <span className="font-mono font-bold text-[#D4AF37] block">POST /v1/webhooks/platform-event</span>
+              <span className="text-[#8A8F9E]">Push leads & alerts from external sites</span>
             </div>
           </div>
         </div>

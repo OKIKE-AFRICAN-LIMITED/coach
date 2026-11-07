@@ -1,14 +1,41 @@
 import { createFileRoute, Outlet, redirect, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
-import { createThread } from "@/lib/threads.functions";
-import { Search, Bell, Sparkles, User } from "lucide-react";
+import {
+  CommandDialog,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandSeparator,
+} from "@/components/ui/command";
+import { createThread, listThreads } from "@/lib/threads.functions";
+import { listTasks } from "@/lib/tasks.functions";
+import { listHabits } from "@/lib/habits.functions";
+import {
+  Search,
+  Bell,
+  Sparkles,
+  User,
+  LayoutDashboard,
+  Sun,
+  CheckSquare,
+  Target,
+  Calendar,
+  Activity,
+  Bot,
+  TrendingUp,
+  Zap,
+  Settings,
+  MessageSquare,
+} from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTaskReminders, ALARM_EVENT, ensurePushSubscribed } from "@/hooks/use-task-reminders";
 import { AlarmOverlay } from "@/components/AlarmOverlay";
@@ -36,11 +63,55 @@ function AuthedLayout() {
   const { handleSnooze: hookSnooze, handleDismiss: hookDismiss } = useTaskReminders();
 
   const createT = useServerFn(createThread);
+  const listTasksFn = useServerFn(listTasks);
+  const listHabitsFn = useServerFn(listHabits);
+  const listThreadsFn = useServerFn(listThreads);
+
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [cmdQuery, setCmdQuery] = useState("");
+
+  const { data: cmdTasks = [] } = useQuery({
+    queryKey: ["tasks"],
+    queryFn: () => listTasksFn(),
+    enabled: cmdOpen,
+  });
+
+  const { data: cmdHabits = [] } = useQuery({
+    queryKey: ["habits"],
+    queryFn: () => listHabitsFn(),
+    enabled: cmdOpen,
+  });
+
+  const { data: cmdThreads = [] } = useQuery({
+    queryKey: ["threads"],
+    queryFn: () => listThreadsFn(),
+    enabled: cmdOpen,
+  });
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCmdOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const newChat = useMutation({
-    mutationFn: async () => createT({ data: {} }),
+    mutationFn: async (promptText?: string) => {
+      const title = promptText ? promptText.slice(0, 80) : undefined;
+      const t = await createT({ data: { title } });
+      if (promptText) {
+        sessionStorage.setItem(`ziri_initial_prompt_${t.id}`, promptText);
+      }
+      return t;
+    },
     onSuccess: (t) => {
       qc.invalidateQueries({ queryKey: ["threads"] });
+      setCmdOpen(false);
+      setCmdQuery("");
       navigate({ to: "/chat/$threadId", params: { threadId: t.id } });
     },
   });
@@ -179,15 +250,26 @@ function AuthedLayout() {
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <SidebarTrigger className="hover:bg-[#141624] text-[#A0A5B5] hover:text-[#E5C185] shrink-0" />
 
-              {/* Search Command Input — hidden on mobile */}
-              <div className="relative hidden md:flex items-center">
+              {/* Search Command Input — opens Command Palette (Ctrl+K) */}
+              <button
+                type="button"
+                onClick={() => setCmdOpen(true)}
+                className="relative hidden md:flex items-center justify-between pl-9 pr-3 py-1.5 rounded-xl bg-[#0F111A] border border-[#1F2336] text-xs text-[#6C7180] hover:border-[#D4AF37]/50 hover:text-[#A0A5B5] w-56 lg:w-80 transition-colors text-left"
+              >
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#8A8F9E]" />
-                <input
-                  type="text"
-                  placeholder="Search command or ask Ziri..."
-                  className="pl-9 pr-4 py-1.5 rounded-xl bg-[#0F111A] border border-[#1F2336] text-xs text-white placeholder:text-[#6C7180] focus:border-[#D4AF37] focus:outline-none w-52 lg:w-80 transition-colors"
-                />
-              </div>
+                <span className="truncate">Search command or ask Ziri...</span>
+                <kbd className="ml-2 px-1.5 py-0.5 text-[10px] font-mono bg-[#141624] border border-[#1F2336] rounded text-[#8A8F9E]">
+                  Ctrl K
+                </kbd>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCmdOpen(true)}
+                className="md:hidden p-2 rounded-xl text-[#8A8F9E] hover:text-white"
+                aria-label="Search or ask Ziri"
+              >
+                <Search className="h-4 w-4" />
+              </button>
             </div>
 
             {/* Top Bar Actions */}
@@ -233,7 +315,7 @@ function AuthedLayout() {
 
               {/* Primary ASK ZIRI CTA */}
               <Button
-                onClick={() => newChat.mutate()}
+                onClick={() => newChat.mutate(undefined)}
                 disabled={newChat.isPending}
                 className="rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#AA7C11] text-[#050507] font-bold text-xs px-2.5 sm:px-4 py-2 shadow-[0_0_20px_rgba(212,175,55,0.2)] hover:scale-105 transition-all gap-1 sm:gap-1.5 shrink-0"
               >
@@ -242,6 +324,136 @@ function AuthedLayout() {
               </Button>
             </div>
           </header>
+
+          {/* Command Palette Modal */}
+          <CommandDialog open={cmdOpen} onOpenChange={setCmdOpen}>
+            <CommandInput
+              placeholder="Search tasks, habits, pages, or type a question for Coach Ziri…"
+              value={cmdQuery}
+              onValueChange={setCmdQuery}
+            />
+            <CommandList>
+              <CommandEmpty>
+                {cmdQuery.trim() ? (
+                  <button
+                    type="button"
+                    onClick={() => newChat.mutate(cmdQuery.trim())}
+                    className="mx-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-[#D4AF37] text-black font-bold text-xs"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Ask Coach Ziri: "{cmdQuery.trim()}"
+                  </button>
+                ) : (
+                  "No matching results."
+                )}
+              </CommandEmpty>
+
+              {cmdQuery.trim().length > 0 && (
+                <CommandGroup heading="AI Coach">
+                  <CommandItem
+                    value={`ask ziri ${cmdQuery}`}
+                    onSelect={() => newChat.mutate(cmdQuery.trim())}
+                  >
+                    <Sparkles className="h-4 w-4 text-[#D4AF37]" />
+                    <span>Ask Coach Ziri: "{cmdQuery.trim()}"</span>
+                  </CommandItem>
+                </CommandGroup>
+              )}
+
+              <CommandGroup heading="Workspace Navigation">
+                {[
+                  { label: "Overview Dashboard", to: "/dashboard", icon: LayoutDashboard },
+                  { label: "My Day Focus", to: "/my-day", icon: Sun },
+                  { label: "Tasks Workspace", to: "/tasks", icon: CheckSquare },
+                  { label: "Goals & Milestones", to: "/goals", icon: Target },
+                  { label: "Calendar Agenda", to: "/calendar", icon: Calendar },
+                  { label: "Habits Tracker", to: "/habits", icon: Activity },
+                  { label: "AI Coach Chat", to: "/chat", icon: Bot },
+                  { label: "Intelligence Insights", to: "/insights", icon: TrendingUp },
+                  { label: "AI Automations", to: "/automations", icon: Zap },
+                  { label: "Settings & Integrations", to: "/settings", icon: Settings },
+                ].map((nav) => (
+                  <CommandItem
+                    key={nav.to}
+                    value={`go to ${nav.label}`}
+                    onSelect={() => {
+                      setCmdOpen(false);
+                      navigate({ to: nav.to });
+                    }}
+                  >
+                    <nav.icon className="h-4 w-4 text-[#D4AF37]" />
+                    <span>{nav.label}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+
+              {cmdTasks.filter((t) => t.status === "todo").length > 0 && (
+                <>
+                  <CommandSeparator />
+                  <CommandGroup heading="Open Tasks">
+                    {cmdTasks
+                      .filter((t) => t.status === "todo")
+                      .slice(0, 8)
+                      .map((t) => (
+                        <CommandItem
+                          key={t.id}
+                          value={`task ${t.title} ${t.priority}`}
+                          onSelect={() => {
+                            setCmdOpen(false);
+                            navigate({ to: "/tasks" });
+                          }}
+                        >
+                          <CheckSquare className="h-4 w-4 text-emerald-400" />
+                          <span className="truncate">{t.title}</span>
+                        </CommandItem>
+                      ))}
+                  </CommandGroup>
+                </>
+              )}
+
+              {cmdHabits.length > 0 && (
+                <>
+                  <CommandSeparator />
+                  <CommandGroup heading="Habits">
+                    {cmdHabits.slice(0, 6).map((h) => (
+                      <CommandItem
+                        key={h.id}
+                        value={`habit ${h.title}`}
+                        onSelect={() => {
+                          setCmdOpen(false);
+                          navigate({ to: "/habits" });
+                        }}
+                      >
+                        <Activity className="h-4 w-4 text-[#D4AF37]" />
+                        <span className="truncate">{h.title}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </>
+              )}
+
+              {cmdThreads.length > 0 && (
+                <>
+                  <CommandSeparator />
+                  <CommandGroup heading="Recent Conversations">
+                    {cmdThreads.slice(0, 5).map((th) => (
+                      <CommandItem
+                        key={th.id}
+                        value={`chat thread ${th.title}`}
+                        onSelect={() => {
+                          setCmdOpen(false);
+                          navigate({ to: "/chat/$threadId", params: { threadId: th.id } });
+                        }}
+                      >
+                        <MessageSquare className="h-4 w-4 text-[#E5C185]" />
+                        <span className="truncate">{th.title}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </>
+              )}
+            </CommandList>
+          </CommandDialog>
 
           {/* Notification permission banner */}
           {notifPermission === "default" && !bannerDismissed && (

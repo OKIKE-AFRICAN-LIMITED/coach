@@ -140,6 +140,34 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  useEffect(() => {
+    // Automatically recover when new deploys replace old hashed chunks (404s)
+    const handleChunkError = (e: ErrorEvent | PromiseRejectionEvent) => {
+      const reason = "reason" in e ? e.reason : e.message;
+      const text = String(reason || "");
+      if (
+        text.includes("Failed to fetch dynamically imported module") ||
+        text.includes("Loading chunk") ||
+        text.includes("error loading dynamically imported module") ||
+        text.includes("Importing a module script failed")
+      ) {
+        const key = "ziri_chunk_reload_ts";
+        const lastReload = parseInt(sessionStorage.getItem(key) || "0", 10);
+        if (Date.now() - lastReload > 8000) {
+          sessionStorage.setItem(key, String(Date.now()));
+          window.location.reload();
+        }
+      }
+    };
+
+    window.addEventListener("error", handleChunkError);
+    window.addEventListener("unhandledrejection", handleChunkError);
+    return () => {
+      window.removeEventListener("error", handleChunkError);
+      window.removeEventListener("unhandledrejection", handleChunkError);
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}

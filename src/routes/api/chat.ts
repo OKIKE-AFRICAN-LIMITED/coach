@@ -119,18 +119,19 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
                 status: z.enum(["todo", "done", "all"]).default("todo"),
               }),
               execute: async ({ status }) => {
-                const q = supabase.from("tasks").select("id,title,due_at,priority,status,notes,created_at");
+                const q = supabase.from("tasks").select("id,title,due_at,remind_at,priority,status,notes,created_at");
                 const { data, error } = status === "all" ? await q : await q.eq("status", status);
                 if (error) return { error: error.message };
                 return { tasks: data };
               },
             }),
             create_task: tool({
-              description: "Create a new task for the user.",
+              description: "Create a new task for the user, optionally with a due date and alarm reminder timestamp.",
               inputSchema: z.object({
                 title: z.string().min(1).max(500),
                 notes: z.string().max(5000).optional(),
-                due_at: z.string().datetime().optional().describe("ISO datetime"),
+                due_at: z.string().datetime().optional().describe("ISO datetime for when the task is due"),
+                remind_at: z.string().datetime().optional().describe("ISO datetime to ring an alarm/notification reminder for this task"),
                 priority: z.enum(["low", "medium", "high"]).default("medium"),
                 recurrence: z.enum(["none", "daily", "weekly"]).default("none"),
               }),
@@ -159,12 +160,13 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
               },
             }),
             update_task: tool({
-              description: "Update fields on an existing task.",
+              description: "Update fields on an existing task, including setting or changing due_at or remind_at.",
               inputSchema: z.object({
                 id: z.string().uuid(),
                 title: z.string().min(1).max(500).optional(),
                 notes: z.string().max(5000).optional(),
                 due_at: z.string().datetime().optional(),
+                remind_at: z.string().datetime().optional(),
                 priority: z.enum(["low", "medium", "high"]).optional(),
               }),
               execute: async ({ id, ...patch }) => {
@@ -185,6 +187,116 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
                 const { error } = await supabase.from("tasks").delete().eq("id", id);
                 if (error) return { error: error.message };
                 return { ok: true };
+              },
+            }),
+            list_habits: tool({
+              description: "List the user's tracked daily habits and their completion logs.",
+              inputSchema: z.object({}),
+              execute: async () => {
+                const { data, error } = await supabase
+                  .from("habits")
+                  .select("id,title,notes,created_at,habit_logs(completed_date)")
+                  .order("created_at", { ascending: true });
+                if (error) return { error: error.message };
+                return { habits: data };
+              },
+            }),
+            create_habit: tool({
+              description: "Create a new daily habit to track.",
+              inputSchema: z.object({
+                title: z.string().min(1).max(100),
+                notes: z.string().max(1000).optional(),
+              }),
+              execute: async ({ title, notes }) => {
+                const { data, error } = await supabase
+                  .from("habits")
+                  .insert({ title, notes, user_id: userId })
+                  .select()
+                  .single();
+                if (error) return { error: error.message };
+                return { habit: data };
+              },
+            }),
+            log_habit: tool({
+              description: "Mark a habit as completed (or uncompleted) for a given date (YYYY-MM-DD).",
+              inputSchema: z.object({
+                habitId: z.string().uuid(),
+                date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe("Date in YYYY-MM-DD format"),
+                completed: z.boolean().default(true),
+              }),
+              execute: async ({ habitId, date, completed }) => {
+                if (completed) {
+                  const { error } = await supabase
+                    .from("habit_logs")
+                    .insert({ habit_id: habitId, user_id: userId, completed_date: date });
+                  if (error && error.code !== "23505") return { error: error.message };
+                } else {
+                  const { error } = await supabase
+                    .from("habit_logs")
+                    .delete()
+                    .eq("habit_id", habitId)
+                    .eq("user_id", userId)
+                    .eq("completed_date", date);
+                  if (error) return { error: error.message };
+                }
+                return { ok: true, habitId, date, completed };
+              },
+            }),
+            list_goals: tool({
+              description: "List the user's strategic goals and milestone progress.",
+              inputSchema: z.object({}),
+              execute: async () => {
+                const { data, error } = await supabase
+                  .from("goals")
+                  .select("*")
+                  .order("created_at", { ascending: false });
+                if (error) return { error: error.message };
+                return { goals: data };
+              },
+            }),
+            create_goal: tool({
+              description: "Create a new strategic goal for the user.",
+              inputSchema: z.object({
+                title: z.string().min(1).max(200),
+                description: z.string().max(2000).optional(),
+                target_date: z.string().optional().describe("Target date YYYY-MM-DD"),
+                progress: z.number().int().min(0).max(100).default(0),
+              }),
+              execute: async ({ title, description, target_date, progress }) => {
+                const { data, error } = await supabase
+                  .from("goals")
+                  .insert({
+                    user_id: userId,
+                    title,
+                    description,
+                    target_date,
+                    progress,
+                    status: progress >= 100 ? "completed" : "active",
+                  })
+                  .select()
+                  .single();
+                if (error) return { error: error.message };
+                return { goal: data };
+              },
+            }),
+            update_goal_progress: tool({
+              description: "Update the progress percentage (0-100) of an existing goal.",
+              inputSchema: z.object({
+                goalId: z.string().uuid(),
+                progress: z.number().int().min(0).max(100),
+              }),
+              execute: async ({ goalId, progress }) => {
+                const { data, error } = await supabase
+                  .from("goals")
+                  .update({
+                    progress,
+                    status: progress >= 100 ? "completed" : "active",
+                  })
+                  .eq("id", goalId)
+                  .select()
+                  .single();
+                if (error) return { error: error.message };
+                return { goal: data };
               },
             }),
             get_briefing: tool({

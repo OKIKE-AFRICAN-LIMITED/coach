@@ -106,21 +106,21 @@ export async function fireNativeNotification(task: AlarmTask) {
     try {
       const reg = await navigator.serviceWorker.ready;
       if (reg && "showNotification" in reg) {
-        await reg.showNotification(title, {
+        const notifOptions: NotificationOptions & Record<string, unknown> = {
           body,
           icon: "/icon-512.png",
           badge: "/icon-512.png",
           tag: `ziri-alarm-${task.id}`,
           requireInteraction: true,
           renotify: true,
-          // @ts-ignore
           vibrate: [300, 100, 300, 100, 300, 500, 300, 100, 300],
           data: { taskId: task.id, url: "/tasks" },
           actions: [
             { action: "snooze_5", title: "⏱ Snooze 5m" },
             { action: "dismiss", title: "✓ Dismiss" },
           ],
-        });
+        };
+        await reg.showNotification(title, notifOptions);
         return;
       }
     } catch (e) {
@@ -167,7 +167,7 @@ export async function ensurePushSubscribed(): Promise<boolean> {
       const appServerKey = urlBase64ToUint8Array(vapidKey);
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: appServerKey,
+        applicationServerKey: appServerKey as unknown as BufferSource,
       });
     }
 

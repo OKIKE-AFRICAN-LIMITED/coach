@@ -13,20 +13,24 @@ export const Route = createFileRoute("/api/reminders/action")({
           };
 
           const { action, taskId, minutes = 5 } = body;
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-          if (!taskId || !action) {
-            return new Response(JSON.stringify({ error: "Missing taskId or action" }), {
+          if (!taskId || !uuidRegex.test(taskId) || !action) {
+            return new Response(JSON.stringify({ error: "Missing or invalid taskId or action" }), {
               status: 400,
               headers: { "Content-Type": "application/json" },
             });
           }
 
+          const clampedMinutes = Math.max(1, Math.min(1440, Number(minutes) || 5));
+
           if (action === "snooze") {
-            const newRemindAt = new Date(Date.now() + minutes * 60_000).toISOString();
+            const newRemindAt = new Date(Date.now() + clampedMinutes * 60_000).toISOString();
             const { error } = await supabaseAdmin
               .from("tasks")
               .update({ remind_at: newRemindAt } as any)
-              .eq("id", taskId);
+              .eq("id", taskId)
+              .eq("status", "todo");
 
             if (error) {
               console.error("Failed to snooze task in DB:", error);

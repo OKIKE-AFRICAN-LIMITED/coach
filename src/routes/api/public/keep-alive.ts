@@ -27,11 +27,24 @@ async function handleKeepAlive() {
       );
     }
 
+    // Optionally ping the Render Python FastAPI engine if PYTHON_BACKEND_URL is configured
+    let pythonEngineStatus = "not_configured";
+    const pythonUrl = process.env.PYTHON_BACKEND_URL || process.env.VITE_PYTHON_API_URL;
+    if (pythonUrl) {
+      try {
+        const pyRes = await fetch(`${pythonUrl.replace(/\/$/, "")}/v1/health`);
+        pythonEngineStatus = pyRes.ok ? "awake" : `http_${pyRes.status}`;
+      } catch {
+        pythonEngineStatus = "unreachable";
+      }
+    }
+
     return new Response(
       JSON.stringify({
         status: "ok",
         message: "Supabase kept alive successfully",
         profilesCount: count,
+        pythonEngineStatus,
         timeMs: Date.now() - startTime,
         timestamp: new Date().toISOString(),
       }),

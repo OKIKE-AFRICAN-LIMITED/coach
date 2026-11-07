@@ -4,7 +4,9 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
+    "dev": "node scripts/dev-all.mjs",
+    "dev:web": "vite dev",
+    "dev:python": "uv run --directory backend --with-requirements requirements.txt uvicorn app.main:app --reload --port 8000",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",

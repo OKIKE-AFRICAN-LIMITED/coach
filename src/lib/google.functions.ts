@@ -84,9 +84,11 @@ export const fetchUpcomingCalendarEvents = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<{ connected: boolean; events: CalendarEventItem[] }> => {
     try {
       const token = await getGoogleAccessToken(context.supabase, context.userId);
-      const timeMin = new Date().toISOString();
-      const timeMax = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
-      const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults=6&timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`;
+      const now = new Date();
+      const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const timeMin = startOfCurrentMonth.toISOString();
+      const timeMax = new Date(Date.now() + 45 * 24 * 3600 * 1000).toISOString();
+      const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults=50&timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`;
       
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
@@ -117,6 +119,48 @@ export const fetchUpcomingCalendarEvents = createServerFn({ method: "GET" })
     } catch {
       return { connected: false, events: [] };
     }
+  });
+
+export const createGoogleCalendarEvent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: unknown) => {
+    const obj = d as Record<string, unknown>;
+    return {
+      summary: String(obj.summary ?? "").trim(),
+      startISO: String(obj.startISO ?? ""),
+      endISO: String(obj.endISO ?? ""),
+      location: obj.location ? String(obj.location).trim() : undefined,
+      description: obj.description ? String(obj.description).trim() : undefined,
+    };
+  })
+  .handler(async ({ context, data }) => {
+    if (!data.summary || !data.startISO || !data.endISO) {
+      throw new Error("Title, start time, and end time are required");
+    }
+    const token = await getGoogleAccessToken(context.supabase, context.userId);
+    const res = await fetch(
+      "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          summary: data.summary,
+          description: data.description,
+          location: data.location,
+          start: { dateTime: new Date(data.startISO).toISOString() },
+          end: { dateTime: new Date(data.endISO).toISOString() },
+        }),
+      },
+    );
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Calendar error ${res.status}: ${errText}`);
+    }
+    const created = await res.json();
+    return { id: created.id as string, htmlLink: created.htmlLink as string | undefined };
   });
 
 export type EmailDigestItem = {

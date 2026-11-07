@@ -31,9 +31,13 @@ function AuthPage() {
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_IN" && session?.provider_refresh_token) {
-        await supabase.rpc('set_google_refresh_token', { 
-          token: session.provider_refresh_token 
-        });
+        try {
+          await supabase.rpc('set_google_refresh_token', { 
+            token: session.provider_refresh_token 
+          });
+        } catch (err) {
+          console.warn("Could not save Google refresh token:", err);
+        }
       }
     });
 

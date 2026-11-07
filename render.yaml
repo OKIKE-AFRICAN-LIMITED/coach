@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: okike-python-engine
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.4
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: GOOGLE_GENERATIVE_AI_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: FIRECRAWL_API_KEY
+        sync: false
+      - key: OKIKE_PLATFORM_API_KEY
+        sync: false
+      - key: OKIKE_OWNER_USER_ID
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://coach-ziri.vercel.app,http://localhost:8080
+
+

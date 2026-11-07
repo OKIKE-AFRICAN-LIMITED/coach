@@ -342,6 +342,19 @@ function Chat({
     textareaRef.current?.focus();
   }, [threadId, status]);
 
+  // Auto-send initial prompt if launched from Top-Bar Command Search
+  const initialSentRef = useRef(false);
+  useEffect(() => {
+    if (initialSentRef.current || status !== "ready") return;
+    const key = `ziri_initial_prompt_${threadId}`;
+    const pendingPrompt = sessionStorage.getItem(key);
+    if (pendingPrompt) {
+      sessionStorage.removeItem(key);
+      initialSentRef.current = true;
+      void sendMessage({ text: pendingPrompt });
+    }
+  }, [threadId, status, sendMessage]);
+
   const isLoading = status === "submitted" || status === "streaming";
 
   // ── Call mode refs & helpers ───────────────────────────────────────────────
