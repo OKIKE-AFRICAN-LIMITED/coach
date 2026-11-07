@@ -13,7 +13,7 @@
   window.__OKIKE_WIDGET_LOADED__ = true;
 
   var script = document.currentScript || document.querySelector('script[src*="okike-widget.js"]');
-  var apiUrl = (script && script.getAttribute("data-api-url")) || "http://localhost:8000";
+  var apiUrl = (script && script.getAttribute("data-api-url")) || "https://coach-4waf.onrender.com";
   var apiKey = (script && script.getAttribute("data-api-key")) || "";
   var userId = (script && script.getAttribute("data-user-id")) || "";
   var platform = (script && script.getAttribute("data-platform")) || window.location.hostname || "okike-site";
