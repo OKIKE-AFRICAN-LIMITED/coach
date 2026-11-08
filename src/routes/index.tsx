@@ -97,6 +97,9 @@ function LandingPage() {
             alt="Coach Ziri Logo"
             className="h-10 w-auto object-contain drop-shadow-[0_0_18px_rgba(212,175,55,0.4)] group-hover:scale-105 transition-transform"
           />
+          <span className="text-sm sm:text-base font-bold tracking-tight text-[#18181B] dark:text-white">
+            Coach Ziri
+          </span>
         </Link>
 
         {/* Center Navigation Links */}

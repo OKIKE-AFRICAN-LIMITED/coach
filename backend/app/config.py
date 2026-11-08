@@ -35,7 +35,7 @@ class Settings:
         origin.strip()
         for origin in os.getenv(
             "CORS_ORIGINS",
-            "http://localhost:8080,http://localhost:3000,http://localhost:5173,https://coach-ziri.vercel.app",
+            "http://localhost:8080,http://localhost:3000,http://localhost:5173,https://coach-ziri.okikeenterprises.com,https://okikeenterprises.com,https://coach-ziri.vercel.app",
         ).split(",")
         if origin.strip()
     ]

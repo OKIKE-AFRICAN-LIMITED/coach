@@ -8,7 +8,7 @@ SELECT cron.schedule(
   '0 0 * * *',  -- At 00:00 (12:00 AM) every day
   $$
   SELECT net.http_get(
-    url := 'https://coach-ziri.vercel.app/api/public/keep-alive'
+    url := 'https://coach-ziri.okikeenterprises.com/api/public/keep-alive'
   );
   $$
 );
