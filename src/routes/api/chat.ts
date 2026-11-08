@@ -9,6 +9,7 @@ import {
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { google } from "@ai-sdk/google";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { Database } from "@/integrations/supabase/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -27,9 +28,10 @@ export const Route = createFileRoute("/api/chat")({
         const SUPABASE_URL = process.env.SUPABASE_URL!;
         const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY!;
         const GOOGLE_GENERATIVE_AI_API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-        
-        if (!GOOGLE_GENERATIVE_AI_API_KEY) {
-          return new Response("Missing GOOGLE_GENERATIVE_AI_API_KEY", { status: 500 });
+        const GROQ_API_KEY = process.env.GROQ_API_KEY;
+
+        if (!GOOGLE_GENERATIVE_AI_API_KEY && !GROQ_API_KEY) {
+          return new Response("Missing AI API credentials", { status: 500 });
         }
 
         const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
@@ -118,8 +120,17 @@ You are built and powered by OKIKE Enterprises (https://okikeenterprises.com), o
 
 You have tools for tasks, web search, calendar, and email. Use them whenever the user asks. Always confirm actions briefly after doing them. When reading aloud, spell out times naturally (e.g. "three thirty PM"). Never paste raw URLs or JSON.`;
 
+        const groqModelName = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
+        const activeModel = GROQ_API_KEY
+          ? createOpenAICompatible({
+              name: "groq",
+              baseURL: "https://api.groq.com/openai/v1",
+              headers: { Authorization: `Bearer ${GROQ_API_KEY}` },
+            })(groqModelName)
+          : google("gemini-3.8-flash");
+
         const result = streamText({
-          model: google("gemini-3-flash-preview"),
+          model: activeModel,
           system,
           messages: await convertToModelMessages(body.messages),
           stopWhen: stepCountIs(50),
