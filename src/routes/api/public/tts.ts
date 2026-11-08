@@ -69,16 +69,10 @@ async function fetchGeminiAudio(
   ];
 
   let lastError = "";
-  const isPromptTtsModel = (m: string) => m.includes("tts");
-
   for (const model of models) {
     try {
-      const promptText = isPromptTtsModel(model)
-        ? `Say in a warm, natural, concise voice: ${text.slice(0, 600)}`
-        : text.slice(0, 600);
-
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 4500);
+      const timeout = setTimeout(() => controller.abort(), 8000);
 
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -87,7 +81,7 @@ async function fetchGeminiAudio(
           signal: controller.signal,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }],
+            contents: [{ parts: [{ text: text.slice(0, 800) }] }],
             generationConfig: {
               responseModalities: ["AUDIO"],
               speechConfig: {

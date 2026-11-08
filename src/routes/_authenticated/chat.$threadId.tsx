@@ -912,9 +912,13 @@ function Chat({
         }
       };
 
-      // Start fetching restChunk in parallel if there is a second part!
-      const restPromise = restChunk ? fetchChunkBlob(restChunk, 6500) : Promise.resolve(null);
-      const firstBlob = await fetchChunkBlob(firstChunk, 2400);
+      // Start fetching restChunk in parallel while the short first sentence synthesizes quickly in Aoede voice!
+      const restPromise = restChunk ? fetchChunkBlob(restChunk, 12000) : Promise.resolve(null);
+      const firstBlob =
+        prewarmedRef.current?.text === firstChunk
+          ? (await prewarmedRef.current.promise) ?? (await fetchChunkBlob(firstChunk, 9000))
+          : await fetchChunkBlob(firstChunk, 9000);
+      prewarmedRef.current = null;
 
       if (!firstBlob || !audioRef.current) {
         speakWithBrowserFallback(clean);
@@ -966,6 +970,37 @@ function Chat({
     },
     [setCallStateSynced, startListening, speakWithBrowserFallback],
   );
+
+  // Pre-warm the first sentence audio WHILE the text is still streaming!
+  const prewarmedRef = useRef<{ text: string; promise: Promise<Blob | null> } | null>(null);
+  useEffect(() => {
+    if (status !== "streaming" && status !== "submitted") return;
+    if (!voiceOn && !callActiveRef.current) return;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant" || spokenRef.current.has(last.id)) return;
+
+    const rawText = last.parts
+      .map((p) => (p.type === "text" ? p.text : ""))
+      .join(" ")
+      .trim();
+    const clean = cleanTextForSpeech(rawText);
+    const match = clean.match(/^(.+?[.!?]+)\s+/);
+    if (match && match[1].length >= 18) {
+      const firstSentence = match[1].trim();
+      if (prewarmedRef.current?.text !== firstSentence) {
+        prewarmedRef.current = {
+          text: firstSentence,
+          promise: fetch("/api/public/tts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: firstSentence }),
+          })
+            .then((r) => (r.ok ? r.blob() : null))
+            .catch(() => null),
+        };
+      }
+    }
+  }, [messages, status, voiceOn]);
 
   // Auto-speak new assistant messages when voice is on or call is active
   useEffect(() => {
