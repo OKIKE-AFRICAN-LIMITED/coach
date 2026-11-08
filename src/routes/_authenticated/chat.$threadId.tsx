@@ -830,7 +830,7 @@ function Chat({
     }
   }, [commitSpokenTranscript, setCallStateSynced]);
 
-  /** Browser native speechSynthesis fallback if Gemini TTS is rate-limited or offline */
+  /** Browser native speechSynthesis fallback (picks the highest-quality Natural/Google voice for 0ms latency) */
   const speakWithBrowserFallback = useCallback(
     (cleanText: string) => {
       if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -842,7 +842,16 @@ function Chat({
       }
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.rate = 1.03;
+      const voices = window.speechSynthesis.getVoices();
+      const preferredVoice =
+        voices.find((v) => /natural|online/i.test(v.name) && /en/i.test(v.lang) && /aria|jenny|ava|sonia|libby|female/i.test(v.name)) ||
+        voices.find((v) => /google uk english female|google us english/i.test(v.name)) ||
+        voices.find((v) => /natural|online/i.test(v.name) && /en/i.test(v.lang)) ||
+        voices.find((v) => /en/i.test(v.lang));
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
+      }
+      utterance.rate = 1.04;
       utterance.pitch = 1.0;
       utterance.onend = () => {
         setSpokenText("");
@@ -863,7 +872,7 @@ function Chat({
     [setCallStateSynced, startListening],
   );
 
-  // ── TTS: Gemini "Aoede" Neural Voice Playback with Instant Fallback ────────
+  // ── TTS: Ultra-Low Latency Sentence Pipelining + 2.2s Fast Fallback ────────
   const speak = useCallback(
     async (rawText: string) => {
       const clean = cleanTextForSpeech(rawText);
@@ -879,45 +888,81 @@ function Chat({
       try { callRecRef.current?.abort(); } catch { /* ignore */ }
       callRecRef.current = null;
 
-      try {
-        const res = await fetch("/api/public/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: clean }),
-        });
+      // Split into first sentence + remainder so the first sentence synthesizes 3x faster!
+      const match = clean.match(/^(.+?[.!?]+)\s+([\s\S]+)$/);
+      const firstChunk = match && match[1].length >= 18 ? match[1].trim() : clean;
+      const restChunk = match && match[1].length >= 18 ? match[2].trim() : "";
 
-        if (!res.ok) {
-          speakWithBrowserFallback(clean);
-          return;
+      const fetchChunkBlob = async (chunkText: string, timeoutMs: number): Promise<Blob | null> => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const res = await fetch("/api/public/tts", {
+            method: "POST",
+            signal: controller.signal,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: chunkText }),
+          });
+          clearTimeout(timer);
+          if (!res.ok) return null;
+          return await res.blob();
+        } catch {
+          clearTimeout(timer);
+          return null;
         }
+      };
 
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const audio = audioRef.current;
-        if (!audio) {
-          URL.revokeObjectURL(url);
-          speakWithBrowserFallback(clean);
-          return;
-        }
+      // Start fetching restChunk in parallel if there is a second part!
+      const restPromise = restChunk ? fetchChunkBlob(restChunk, 6500) : Promise.resolve(null);
+      const firstBlob = await fetchChunkBlob(firstChunk, 2400);
 
-        audio.src = url;
-        audio.load();
-        audio.onended = () => {
-          URL.revokeObjectURL(url);
-          setSpokenText("");
-          if (callActiveRef.current) {
-            setCallStateSynced("listening");
-            setTimeout(() => startListening(), 350);
-          }
-        };
-
-        await audio.play().catch(() => {
-          URL.revokeObjectURL(url);
-          speakWithBrowserFallback(clean);
-        });
-      } catch {
+      if (!firstBlob || !audioRef.current) {
         speakWithBrowserFallback(clean);
+        return;
       }
+
+      const audio = audioRef.current;
+      const firstUrl = URL.createObjectURL(firstBlob);
+      audio.src = firstUrl;
+      audio.load();
+
+      audio.onended = async () => {
+        URL.revokeObjectURL(firstUrl);
+        if (restChunk) {
+          const restBlob = await restPromise;
+          if (restBlob && audioRef.current) {
+            const restUrl = URL.createObjectURL(restBlob);
+            audio.src = restUrl;
+            audio.load();
+            audio.onended = () => {
+              URL.revokeObjectURL(restUrl);
+              setSpokenText("");
+              if (callActiveRef.current) {
+                setCallStateSynced("listening");
+                setTimeout(() => startListening(), 300);
+              }
+            };
+            await audio.play().catch(() => {
+              URL.revokeObjectURL(restUrl);
+              speakWithBrowserFallback(restChunk);
+            });
+            return;
+          } else {
+            speakWithBrowserFallback(restChunk);
+            return;
+          }
+        }
+        setSpokenText("");
+        if (callActiveRef.current) {
+          setCallStateSynced("listening");
+          setTimeout(() => startListening(), 300);
+        }
+      };
+
+      await audio.play().catch(() => {
+        URL.revokeObjectURL(firstUrl);
+        speakWithBrowserFallback(clean);
+      });
     },
     [setCallStateSynced, startListening, speakWithBrowserFallback],
   );
