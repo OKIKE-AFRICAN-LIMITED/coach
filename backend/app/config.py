@@ -28,8 +28,8 @@ class Settings:
     FIRECRAWL_API_KEY: str = os.getenv("FIRECRAWL_API_KEY", "")
 
     # Shared secret for connecting other OKIKE platforms / webhooks / bots
-    OKIKE_PLATFORM_API_KEY: str = os.getenv("OKIKE_PLATFORM_API_KEY", "okike-live-secret-2026")
-    DEFAULT_OWNER_USER_ID: str = os.getenv("OKIKE_OWNER_USER_ID", "3206f2b2-c05d-485c-9361-ee0946a7efb1")
+    OKIKE_PLATFORM_API_KEY: str = os.getenv("OKIKE_PLATFORM_API_KEY", "")
+    DEFAULT_OWNER_USER_ID: str = os.getenv("OKIKE_OWNER_USER_ID", "")
 
     CORS_ORIGINS: list[str] = [
         origin.strip()
