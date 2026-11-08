@@ -69,7 +69,18 @@ import {
 } from "@/components/ai-elements/tool";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Mic, Square, Volume2, VolumeX, Phone, PhoneOff } from "lucide-react";
+import {
+  Mic,
+  MicOff,
+  Square,
+  Volume2,
+  VolumeX,
+  Phone,
+  PhoneOff,
+  Sparkles,
+  Minimize2,
+  Hand,
+} from "lucide-react";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -92,6 +103,18 @@ async function primeAudioElement(audio: HTMLAudioElement) {
   audio.pause();
   audio.currentTime = 0;
   audio.muted = false;
+}
+
+/** Strips Markdown syntax so TTS speaks naturally without reading symbols. */
+function cleanTextForSpeech(raw: string): string {
+  return raw
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[*_~#>-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /** Returns the browser's SpeechRecognition constructor (handles webkit prefix). */
@@ -144,7 +167,7 @@ function useMicVolume(enabled: boolean) {
           }
           const avg = sum / dataArray.length;
           // Scale avg (0..255) to 0..1 with sensitivity curve
-          const norm = Math.min(1, avg / 60);
+          const norm = Math.min(1, avg / 55);
           setVolume(norm);
           animId = requestAnimationFrame(tick);
         };
@@ -167,7 +190,7 @@ function useMicVolume(enabled: boolean) {
   return volume;
 }
 
-// ─── Voice Equalizer / Waveform Visualizer Component ────────────────────────
+// ─── Inline Voice Pill (When Modal is Minimized or Single-Mic Active) ──────
 
 function VoiceVisualizer({
   active,
@@ -175,16 +198,17 @@ function VoiceVisualizer({
   callActive,
   callState,
   micVolume,
+  onExpandModal,
 }: {
   active: boolean;
   recording: boolean;
   callActive: boolean;
   callState: "idle" | "listening" | "thinking" | "speaking";
   micVolume: number;
+  onExpandModal?: () => void;
 }) {
   const [ticker, setTicker] = useState(0);
 
-  // Force tick animation for AI speaking/thinking modes
   useEffect(() => {
     if (!active) return;
     const timer = setInterval(() => setTicker((t) => (t + 1) % 100), 80);
@@ -205,8 +229,8 @@ function VoiceVisualizer({
       statusBadge = "Low Sound";
       badgeColor = "bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30";
     } else {
-      statusBadge = "Silent";
-      badgeColor = "bg-zinc-500/20 text-zinc-500 border-zinc-500/30";
+      statusBadge = "Listening";
+      badgeColor = "bg-[#D4AF37]/20 text-[#E5C185] border-[#D4AF37]/30";
     }
   } else if (callState === "thinking") {
     statusText = "Thinking…";
@@ -214,22 +238,26 @@ function VoiceVisualizer({
     badgeColor = "bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30";
   } else if (callState === "speaking") {
     statusText = "Coach Ziri speaking";
-    statusBadge = "Audio Output";
-    badgeColor = "bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/30";
+    statusBadge = "Live Audio";
+    badgeColor = "bg-[#D4AF37]/20 text-[#E5C185] border-[#D4AF37]/40";
   }
 
   const bars = [0.5, 0.95, 1.0, 0.8, 0.6];
 
   return (
-    <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-background/95 border shadow-sm text-xs font-medium animate-in fade-in slide-in-from-bottom-2">
-      {/* Equalizer bars */}
+    <button
+      type="button"
+      onClick={onExpandModal}
+      className="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-background/95 border border-[#D4AF37]/30 shadow-sm text-xs font-medium animate-in fade-in slide-in-from-bottom-2 hover:border-[#D4AF37] transition-all cursor-pointer"
+      title={callActive ? "Click to open full Voice Conversation view" : undefined}
+    >
       <div className="flex items-center gap-1 h-4 w-7 justify-center">
         {bars.map((factor, i) => {
           let heightPercent = 20;
           if (callState === "speaking") {
-            heightPercent = 25 + Math.abs(Math.sin((ticker / 2) + i)) * 75;
+            heightPercent = 25 + Math.abs(Math.sin(ticker / 2 + i)) * 75;
           } else if (callState === "thinking") {
-            heightPercent = 30 + Math.abs(Math.cos((ticker / 3) + i)) * 40;
+            heightPercent = 30 + Math.abs(Math.cos(ticker / 3 + i)) * 40;
           } else {
             heightPercent = Math.max(15, Math.min(100, micVolume * 100 * factor * 1.6));
           }
@@ -239,7 +267,7 @@ function VoiceVisualizer({
               key={i}
               className={`w-1 rounded-full transition-all duration-75 ${
                 callState === "speaking"
-                  ? "bg-purple-500"
+                  ? "bg-[#D4AF37]"
                   : callState === "thinking"
                     ? "bg-blue-500 animate-pulse"
                     : micVolume > 0.2
@@ -254,13 +282,280 @@ function VoiceVisualizer({
         })}
       </div>
 
-      <span className="truncate max-w-[110px] text-xs font-medium">{statusText}</span>
+      <span className="truncate max-w-[120px] text-xs font-medium">{statusText}</span>
 
       <span
         className={`px-2 py-0.5 rounded-full border text-[10px] font-semibold tracking-wide transition-colors ${badgeColor}`}
       >
         {statusBadge}
       </span>
+    </button>
+  );
+}
+
+// ─── Full-Screen / Immersive Luxury Voice Conversation Modal ────────────────
+
+function VoiceCallModal({
+  open,
+  callState,
+  micMuted,
+  micVolume,
+  liveTranscript,
+  spokenText,
+  activeToolName,
+  onToggleMute,
+  onInterrupt,
+  onMinimize,
+  onEndCall,
+}: {
+  open: boolean;
+  callState: "idle" | "listening" | "thinking" | "speaking";
+  micMuted: boolean;
+  micVolume: number;
+  liveTranscript: string;
+  spokenText: string;
+  activeToolName: string | null;
+  onToggleMute: () => void;
+  onInterrupt: () => void;
+  onMinimize: () => void;
+  onEndCall: () => void;
+}) {
+  const [ticker, setTicker] = useState(0);
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!open) return;
+    const t = setInterval(() => setTicker((x) => (x + 1) % 360), 60);
+    return () => clearInterval(t);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      setSeconds(0);
+      return;
+    }
+    const timer = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(timer);
+  }, [open]);
+
+  if (!open) return null;
+
+  const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const secs = String(seconds % 60).padStart(2, "0");
+
+  // Dynamic orb scale based on mic volume or speaking state
+  const dynamicScale =
+    callState === "speaking"
+      ? 1.08 + Math.abs(Math.sin(ticker / 4)) * 0.16
+      : callState === "thinking"
+        ? 1.0 + Math.sin(ticker / 6) * 0.06
+        : micMuted
+          ? 0.95
+          : 1.0 + micVolume * 0.35;
+
+  const stateHeadline = micMuted
+    ? "Microphone Muted"
+    : callState === "speaking"
+      ? "Coach Ziri is speaking"
+      : callState === "thinking"
+        ? activeToolName
+          ? `Executing ${activeToolName.replace(/_/g, " ")}…`
+          : "Coach Ziri is thinking…"
+        : "Listening to you…";
+
+  const stateSubtext = micMuted
+    ? "Tap Unmute below whenever you're ready to speak"
+    : callState === "speaking"
+      ? "Speak anytime or tap Interrupt to jump in"
+      : callState === "thinking"
+        ? "Analyzing your workspace & preparing response"
+        : liveTranscript
+          ? `"${liveTranscript}"`
+          : "Speak naturally — I'm listening";
+
+  const waveBars = Array.from({ length: 24 }, (_, idx) => idx);
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-between bg-[#050507]/95 backdrop-blur-2xl text-[#F3F4F6] p-6 sm:p-10 animate-in fade-in duration-200 select-none overflow-hidden">
+      {/* Subtle Ambient Gold Glows */}
+      <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[480px] rounded-full bg-[#D4AF37]/10 blur-[140px]" />
+
+      {/* Top Header Bar */}
+      <div className="relative z-10 w-full max-w-3xl flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-xl bg-[#0F111A] border border-[#D4AF37]/40 flex items-center justify-center shadow-[0_0_20px_rgba(212,175,55,0.2)]">
+            <Sparkles className="h-4 w-4 text-[#D4AF37]" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold tracking-tight text-white">Coach Ziri Live</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                {mins}:{secs}
+              </span>
+            </div>
+            <p className="text-[11px] text-[#8A8F9E]">Hands-free Neural Voice Session</p>
+          </div>
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onMinimize}
+          className="rounded-xl bg-[#0F111A] border-[#1F2336] text-xs text-[#A0A5B5] hover:text-white hover:border-[#D4AF37]/40 gap-1.5"
+        >
+          <Minimize2 className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Minimize to Chat</span>
+        </Button>
+      </div>
+
+      {/* Center Neural Orb & Live Captions */}
+      <div className="relative z-10 flex flex-col items-center justify-center my-auto max-w-2xl w-full text-center space-y-8 px-4">
+        {/* Animated Concentric Aura Rings */}
+        <div className="relative flex items-center justify-center h-56 w-56 sm:h-64 sm:w-64">
+          {/* Outer Pulse Ring */}
+          <div
+            className={`absolute inset-0 rounded-full transition-transform duration-150 ${
+              callState === "speaking"
+                ? "border-2 border-[#D4AF37]/40 bg-[#D4AF37]/5 shadow-[0_0_80px_rgba(212,175,55,0.3)]"
+                : callState === "thinking"
+                  ? "border border-blue-400/30 bg-blue-500/5 animate-spin"
+                  : "border border-[#D4AF37]/25 bg-[#D4AF37]/5"
+            }`}
+            style={{ transform: `scale(${dynamicScale * 1.15})` }}
+          />
+
+          {/* Middle Harmonic Ring */}
+          <div
+            className={`absolute inset-6 rounded-full transition-transform duration-100 ${
+              callState === "speaking"
+                ? "border border-[#F5E0A3]/50 bg-gradient-to-b from-[#D4AF37]/20 to-transparent"
+                : callState === "thinking"
+                  ? "border border-blue-400/40 bg-blue-500/10"
+                  : "border border-emerald-400/30 bg-emerald-500/5"
+            }`}
+            style={{ transform: `scale(${dynamicScale})` }}
+          />
+
+          {/* Core Luxury Orb */}
+          <div
+            onClick={callState === "speaking" ? onInterrupt : undefined}
+            className={`relative h-32 w-32 sm:h-36 sm:w-36 rounded-full flex flex-col items-center justify-center transition-all duration-150 shadow-[0_0_50px_rgba(212,175,55,0.35)] border ${
+              callState === "speaking"
+                ? "bg-gradient-to-br from-[#F5E0A3] via-[#D4AF37] to-[#8C6508] border-[#FFF3C4] cursor-pointer"
+                : callState === "thinking"
+                  ? "bg-gradient-to-br from-[#141829] via-[#0F111A] to-[#050507] border-blue-400/50"
+                  : micMuted
+                    ? "bg-[#141624] border-red-500/40"
+                    : "bg-gradient-to-br from-[#1B1810] via-[#0F111A] to-[#050507] border-[#D4AF37]/60"
+            }`}
+            style={{ transform: `scale(${Math.max(0.92, Math.min(1.18, dynamicScale))})` }}
+          >
+            <img
+              src="/logo.png"
+              alt="Coach Ziri"
+              className={`h-14 w-auto object-contain transition-transform ${
+                callState === "speaking" ? "brightness-110 scale-105" : " drop-shadow-[0_0_12px_rgba(212,175,55,0.5)]"
+              }`}
+            />
+          </div>
+        </div>
+
+        {/* 24-Bar Equalizer Spectrum */}
+        <div className="flex items-center justify-center gap-1 h-10 w-full max-w-xs">
+          {waveBars.map((i) => {
+            const centerDist = Math.abs(i - 11.5) / 11.5;
+            const envelope = 1 - centerDist * 0.65;
+            let barH = 14;
+            if (callState === "speaking") {
+              barH = 18 + Math.abs(Math.sin(ticker / 2.2 + i * 0.55)) * 82 * envelope;
+            } else if (callState === "thinking") {
+              barH = 16 + Math.abs(Math.cos(ticker / 4 + i * 0.4)) * 45 * envelope;
+            } else if (!micMuted) {
+              barH = Math.max(12, Math.min(100, micVolume * 145 * envelope * (0.7 + ((i * 7) % 5) * 0.1)));
+            }
+            return (
+              <span
+                key={i}
+                className={`w-1 rounded-full transition-all duration-75 ${
+                  callState === "speaking"
+                    ? "bg-gradient-to-t from-[#AA7C11] to-[#F5E0A3]"
+                    : callState === "thinking"
+                      ? "bg-blue-400/80"
+                      : micMuted
+                        ? "bg-red-500/30"
+                        : micVolume > 0.08
+                          ? "bg-emerald-400"
+                          : "bg-[#D4AF37]/40"
+                }`}
+                style={{ height: `${barH}%` }}
+              />
+            );
+          })}
+        </div>
+
+        {/* Status Headline & Live Transcript / Subtitles */}
+        <div className="space-y-3 max-w-xl min-h-[96px] flex flex-col items-center justify-center">
+          <span className="text-xs font-mono uppercase tracking-[0.2em] text-[#D4AF37] font-semibold">
+            {stateHeadline}
+          </span>
+
+          {callState === "speaking" && spokenText ? (
+            <p className="text-base sm:text-lg font-medium text-white/95 leading-relaxed line-clamp-4 animate-in fade-in">
+              "{spokenText}"
+            </p>
+          ) : (
+            <p
+              className={`text-sm sm:text-base leading-relaxed transition-colors ${
+                liveTranscript ? "text-emerald-300 font-medium" : "text-[#8A8F9E]"
+              }`}
+            >
+              {stateSubtext}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom Call Control Dock */}
+      <div className="relative z-10 flex items-center justify-center gap-4 sm:gap-6 pb-2">
+        {/* Mute / Unmute Mic */}
+        <button
+          type="button"
+          onClick={onToggleMute}
+          className={`h-14 w-14 rounded-full flex items-center justify-center border transition-all cursor-pointer ${
+            micMuted
+              ? "bg-red-500/20 border-red-500/50 text-red-400 hover:bg-red-500/30"
+              : "bg-[#0F111A] border-[#1F2336] text-white hover:border-[#D4AF37]/50 hover:bg-[#141624]"
+          }`}
+          title={micMuted ? "Unmute microphone" : "Mute microphone"}
+          aria-label={micMuted ? "Unmute microphone" : "Mute microphone"}
+        >
+          {micMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+        </button>
+
+        {/* Interrupt / Tap to Speak (Active while Ziri is speaking) */}
+        {callState === "speaking" && (
+          <button
+            type="button"
+            onClick={onInterrupt}
+            className="h-14 px-6 rounded-full flex items-center gap-2 bg-[#141624] border border-[#D4AF37]/50 text-[#F5E0A3] text-xs font-bold uppercase tracking-wider hover:bg-[#D4AF37] hover:text-black transition-all shadow-[0_0_25px_rgba(212,175,55,0.2)] cursor-pointer"
+          >
+            <Hand className="h-4 w-4" />
+            <span>Interrupt</span>
+          </button>
+        )}
+
+        {/* End Call Button */}
+        <button
+          type="button"
+          onClick={onEndCall}
+          className="h-14 px-7 rounded-full flex items-center gap-2.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider shadow-[0_0_30px_rgba(220,38,38,0.4)] hover:scale-105 transition-all cursor-pointer"
+          title="End voice call"
+        >
+          <PhoneOff className="h-4 w-4" />
+          <span>End Call</span>
+        </button>
+      </div>
     </div>
   );
 }
@@ -362,13 +657,18 @@ function Chat({
 
   const isLoading = status === "submitted" || status === "streaming";
 
-  // ── Call mode refs & helpers ───────────────────────────────────────────────
+  // ── Call mode refs & state ────────────────────────────────────────────────
   const [callActive, setCallActive] = useState(false);
+  const [callModalOpen, setCallModalOpen] = useState(false);
+  const [micMuted, setMicMuted] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState("");
+  const [spokenText, setSpokenText] = useState("");
   const [callState, setCallState] = useState<
     "idle" | "listening" | "thinking" | "speaking"
   >("idle");
 
   const callActiveRef = useRef(false);
+  const micMutedRef = useRef(false);
   const callStateRef = useRef<"idle" | "listening" | "thinking" | "speaking">("idle");
   const callRecRef = useRef<ISpeechRecognition | null>(null);
   const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -381,15 +681,19 @@ function Chat({
     [],
   );
 
-  /** Starts one SpeechRecognition session. On end, re-arms itself unless stopped. */
+  // Pre-seed spokenRef with initial message IDs so historical messages never auto-play on page load
+  const [voiceOn, setVoiceOn] = useState(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const spokenRef = useRef<Set<string>>(new Set(initial.map((m) => m.id)));
+
+  /** Starts one SpeechRecognition session. On end, re-arms itself unless stopped or muted. */
   const startListening = useCallback(() => {
-    if (!callActiveRef.current) return;
+    if (!callActiveRef.current || micMutedRef.current) return;
     if (callStateRef.current === "speaking" || callStateRef.current === "thinking") return;
 
     const SR = getSR();
     if (!SR) return;
 
-    // Abort any previous instance before creating a new one
     try {
       if (callRecRef.current) {
         callRecRef.current.abort();
@@ -398,22 +702,34 @@ function Chat({
     callRecRef.current = null;
 
     const r = new SR();
-    r.continuous = false;       // one utterance → natural pauses trigger onend
-    r.interimResults = true;    // enables barge-in detection on interim results
+    r.continuous = false;
+    r.interimResults = true;
     r.lang = "en-US";
 
     r.onresult = async (e: SpeechRecognitionEvent) => {
-      // Barge-in: stop TTS the moment we detect speech
+      if (micMutedRef.current) return;
+
+      // Barge-in: stop TTS if user starts speaking
       if (audioRef.current && !audioRef.current.paused) {
         audioRef.current.pause();
       }
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+
+      let combinedInterim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        combinedInterim += e.results[i][0].transcript;
+      }
+      setLiveTranscript(combinedInterim.trim());
 
       const last = e.results[e.results.length - 1];
-      if (!last.isFinal) return; // interim result — keep waiting
+      if (!last.isFinal) return;
 
       const text = last[0].transcript.trim();
       if (!text) return;
 
+      setLiveTranscript(text);
       setCallStateSynced("thinking");
       try { r.abort(); } catch { /* ignore */ }
       callRecRef.current = null;
@@ -421,23 +737,23 @@ function Chat({
       try {
         await sendMessage({ text });
       } catch {
+        setLiveTranscript("");
         setCallStateSynced("listening");
-        setTimeout(() => startListening(), 400);
+        setTimeout(() => startListening(), 350);
       }
     };
 
     r.onend = () => {
-      callRecRef.current = null; // mark as dead so watchdog can detect it
-      if (!callActiveRef.current) return;
+      callRecRef.current = null;
+      if (!callActiveRef.current || micMutedRef.current) return;
       const state = callStateRef.current;
       if (state === "thinking" || state === "speaking") return;
-      // no-speech timeout or silence — restart quickly
       setTimeout(() => startListening(), 250);
     };
 
     r.onerror = (e: SpeechRecognitionErrorEvent) => {
-      callRecRef.current = null; // mark dead on error
-      if (!callActiveRef.current || e.error === "aborted" || e.error === "no-speech") return;
+      callRecRef.current = null;
+      if (!callActiveRef.current || micMutedRef.current || e.error === "aborted" || e.error === "no-speech") return;
       if (e.error === "network") {
         setTimeout(() => startListening(), 800);
         return;
@@ -450,106 +766,133 @@ function Chat({
       r.start();
       setCallStateSynced("listening");
     } catch {
-      // If start failed, reset ref to null so watchdog/retry can pick it up
       callRecRef.current = null;
       setTimeout(() => startListening(), 400);
     }
   }, [sendMessage, setCallStateSynced]);
 
-  // ── TTS: Gemini "Aoede" Neural Voice Playback ──────────────────────────────
-  const [voiceOn, setVoiceOn] = useState(true);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const spokenRef = useRef<Set<string>>(new Set());
-
-  const speak = useCallback(async (text: string) => {
-    // Show speaking indicator immediately while fetching audio
-    if (callActiveRef.current) {
-      setCallStateSynced("speaking");
-    }
-
-    try {
-      const res = await fetch("/api/public/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-
-      if (!res.ok) {
+  /** Browser native speechSynthesis fallback if Gemini TTS is rate-limited or offline */
+  const speakWithBrowserFallback = useCallback(
+    (cleanText: string) => {
+      if (typeof window === "undefined" || !("speechSynthesis" in window)) {
         if (callActiveRef.current) {
           setCallStateSynced("listening");
-          setTimeout(() => startListening(), 400);
+          setTimeout(() => startListening(), 350);
         }
         return;
       }
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = audioRef.current;
-      if (!audio) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.rate = 1.03;
+      utterance.pitch = 1.0;
+      utterance.onend = () => {
+        setSpokenText("");
         if (callActiveRef.current) {
           setCallStateSynced("listening");
-          setTimeout(() => startListening(), 400);
-        }
-        return;
-      }
-
-      audio.src = url;
-      audio.load();
-      audio.onended = () => {
-        URL.revokeObjectURL(url);
-        if (callActiveRef.current) {
-          setCallStateSynced("listening");
-          setTimeout(() => startListening(), 400);
+          setTimeout(() => startListening(), 350);
         }
       };
+      utterance.onerror = () => {
+        setSpokenText("");
+        if (callActiveRef.current) {
+          setCallStateSynced("listening");
+          setTimeout(() => startListening(), 350);
+        }
+      };
+      window.speechSynthesis.speak(utterance);
+    },
+    [setCallStateSynced, startListening],
+  );
+
+  // ── TTS: Gemini "Aoede" Neural Voice Playback with Instant Fallback ────────
+  const speak = useCallback(
+    async (rawText: string) => {
+      const clean = cleanTextForSpeech(rawText);
+      if (!clean) return;
+
+      setLiveTranscript("");
+      setSpokenText(clean);
+      if (callActiveRef.current) {
+        setCallStateSynced("speaking");
+      }
 
       // Abort mic before playing TTS so speaker audio isn't recorded as user input
       try { callRecRef.current?.abort(); } catch { /* ignore */ }
       callRecRef.current = null;
 
-      await audio.play().catch(() => {
-        if (callActiveRef.current) {
-          setCallStateSynced("listening");
-          setTimeout(() => startListening(), 400);
-        }
-      });
-    } catch {
-      if (callActiveRef.current) {
-        setCallStateSynced("listening");
-        setTimeout(() => startListening(), 400);
-      }
-    }
-  }, [setCallStateSynced, startListening]);
+      try {
+        const res = await fetch("/api/public/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: clean }),
+        });
 
-  // Auto-speak new assistant messages when voice is on
+        if (!res.ok) {
+          speakWithBrowserFallback(clean);
+          return;
+        }
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = audioRef.current;
+        if (!audio) {
+          URL.revokeObjectURL(url);
+          speakWithBrowserFallback(clean);
+          return;
+        }
+
+        audio.src = url;
+        audio.load();
+        audio.onended = () => {
+          URL.revokeObjectURL(url);
+          setSpokenText("");
+          if (callActiveRef.current) {
+            setCallStateSynced("listening");
+            setTimeout(() => startListening(), 350);
+          }
+        };
+
+        await audio.play().catch(() => {
+          URL.revokeObjectURL(url);
+          speakWithBrowserFallback(clean);
+        });
+      } catch {
+        speakWithBrowserFallback(clean);
+      }
+    },
+    [setCallStateSynced, startListening, speakWithBrowserFallback],
+  );
+
+  // Auto-speak new assistant messages when voice is on or call is active
   useEffect(() => {
     if (status !== "ready") return;
     const last = messages[messages.length - 1];
     if (!last || last.role !== "assistant") return;
 
-    // Extract text parts
     const text = last.parts
       .map((p) => (p.type === "text" ? p.text : ""))
       .join(" ")
       .trim();
 
-    // If message only contains tool calls (no text response yet), stay in thinking state
     if (!text) return;
 
-    // Check if this text response has already been spoken
     if (spokenRef.current.has(last.id)) return;
     spokenRef.current.add(last.id);
 
-    if (voiceOn) {
+    if (voiceOn || callActiveRef.current) {
       void speak(text);
     } else if (callActiveRef.current) {
-      // Voice off: resume listening in call mode
       setCallStateSynced("listening");
-      setTimeout(() => startListening(), 400);
+      setTimeout(() => startListening(), 350);
     }
   }, [messages, status, voiceOn, speak, setCallStateSynced, startListening]);
 
-  useEffect(() => () => { audioRef.current?.pause(); }, []);
+  useEffect(() => () => {
+    audioRef.current?.pause();
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  }, []);
 
   // ── STT: mic button (single utterance via Web Speech API) ─────────────────
   const [recording, setRecording] = useState(false);
@@ -596,6 +939,7 @@ function Chat({
 
   const stopCall = useCallback(() => {
     callActiveRef.current = false;
+    micMutedRef.current = false;
     if (watchdogRef.current) {
       clearInterval(watchdogRef.current);
       watchdogRef.current = null;
@@ -603,7 +947,14 @@ function Chat({
     try { callRecRef.current?.abort(); } catch { /* ignore */ }
     callRecRef.current = null;
     audioRef.current?.pause();
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
     setCallActive(false);
+    setCallModalOpen(false);
+    setMicMuted(false);
+    setLiveTranscript("");
+    setSpokenText("");
     setCallStateSynced("idle");
   }, [setCallStateSynced]);
 
@@ -613,15 +964,20 @@ function Chat({
       return;
     }
     if (!audioRef.current) audioRef.current = new Audio();
-    await primeAudioElement(audioRef.current); // unlock autoplay
+    await primeAudioElement(audioRef.current);
     callActiveRef.current = true;
+    micMutedRef.current = false;
+    setMicMuted(false);
+    setLiveTranscript("");
+    setSpokenText("");
     setCallActive(true);
+    setCallModalOpen(true);
     startListening();
 
-    // Watchdog: every 2.5 s, revive recognition if it silently died
     watchdogRef.current = setInterval(() => {
       if (
         callActiveRef.current &&
+        !micMutedRef.current &&
         callStateRef.current === "listening" &&
         callRecRef.current === null
       ) {
@@ -630,36 +986,50 @@ function Chat({
     }, 2_500);
   }, [startListening]);
 
-  // Restart listening after TTS finishes speaking during a call
-  useEffect(() => {
-    if (!callActive) return;
-    const a = audioRef.current;
-    if (!a) return;
+  const toggleMicMute = useCallback(() => {
+    const next = !micMutedRef.current;
+    micMutedRef.current = next;
+    setMicMuted(next);
+    if (next) {
+      try { callRecRef.current?.abort(); } catch { /* ignore */ }
+      callRecRef.current = null;
+      setLiveTranscript("");
+    } else if (callActiveRef.current && callStateRef.current === "listening") {
+      startListening();
+    }
+  }, [startListening]);
 
-    const onPlay = () => setCallStateSynced("speaking");
-    const onEnded = () => {
-      if (callActiveRef.current) {
-        setCallStateSynced("listening");
-        // Give browser a short breath before re-arming recognition
-        setTimeout(() => startListening(), 400);
-      }
-    };
-
-    a.addEventListener("play", onPlay);
-    a.addEventListener("ended", onEnded);
-    return () => {
-      a.removeEventListener("play", onPlay);
-      a.removeEventListener("ended", onEnded);
-    };
-  }, [callActive, startListening, setCallStateSynced]);
+  const interruptSpeech = useCallback(() => {
+    audioRef.current?.pause();
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    setSpokenText("");
+    if (callActiveRef.current) {
+      setCallStateSynced("listening");
+      setTimeout(() => startListening(), 200);
+    }
+  }, [setCallStateSynced, startListening]);
 
   // Cleanup on unmount or thread change
   useEffect(() => () => stopCall(), [stopCall]);
 
-  // ─── UI ───────────────────────────────────────────────────────────────────
+  // Detect any currently executing tool name for modal feedback
+  const activeToolName = useMemo(() => {
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return null;
+    for (let i = last.parts.length - 1; i >= 0; i--) {
+      const p = last.parts[i];
+      if (typeof p.type === "string" && p.type.startsWith("tool-")) {
+        return p.type.replace(/^tool-/, "");
+      }
+    }
+    return null;
+  }, [messages]);
 
-  // Live microphone volume metering (active during mic recording or call listening)
-  const isMicMeteringActive = recording || (callActive && callState === "listening");
+  // Live microphone volume metering
+  const isMicMeteringActive =
+    recording || (callActive && callState === "listening" && !micMuted);
   const micVolume = useMicVolume(isMicMeteringActive);
 
   return (
@@ -670,6 +1040,21 @@ function Chat({
         preload="auto"
         className="h-0 w-0 opacity-0"
         tabIndex={-1}
+      />
+
+      {/* Full-Screen / Immersive Voice Call Modal */}
+      <VoiceCallModal
+        open={callActive && callModalOpen}
+        callState={isLoading && callState !== "speaking" ? "thinking" : callState}
+        micMuted={micMuted}
+        micVolume={micVolume}
+        liveTranscript={liveTranscript}
+        spokenText={spokenText}
+        activeToolName={activeToolName}
+        onToggleMute={toggleMicMute}
+        onInterrupt={interruptSpeech}
+        onMinimize={() => setCallModalOpen(false)}
+        onEndCall={stopCall}
       />
 
       <Conversation className="flex-1">
@@ -804,7 +1189,12 @@ function Chat({
                 size="icon"
                 variant="ghost"
                 onClick={() => {
-                  if (voiceOn) audioRef.current?.pause();
+                  if (voiceOn) {
+                    audioRef.current?.pause();
+                    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+                      window.speechSynthesis.cancel();
+                    }
+                  }
                   setVoiceOn((v) => !v);
                 }}
                 aria-label={voiceOn ? "Mute Coach Ziri's voice" : "Unmute Coach Ziri's voice"}
@@ -834,13 +1224,14 @@ function Chat({
                 )}
               </Button>
 
-              {/* Real-time Voice Equalizer & Sound Level Visualizer */}
+              {/* Real-time Voice Equalizer Pill (clicks to re-open modal if minimized) */}
               <VoiceVisualizer
                 active={recording || callActive}
                 recording={recording}
                 callActive={callActive}
                 callState={callState}
                 micVolume={micVolume}
+                onExpandModal={callActive ? () => setCallModalOpen(true) : undefined}
               />
             </div>
 
