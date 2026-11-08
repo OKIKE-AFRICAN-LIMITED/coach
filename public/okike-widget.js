@@ -14,9 +14,9 @@
 
   var script = document.currentScript || document.querySelector('script[src*="okike-widget.js"]');
   var apiUrl = (script && script.getAttribute("data-api-url")) || "https://coach-4waf.onrender.com";
-  var apiKey = (script && script.getAttribute("data-api-key")) || "";
-  var userId = (script && script.getAttribute("data-user-id")) || "";
-  var platform = (script && script.getAttribute("data-platform")) || window.location.hostname || "okike-site";
+  var apiKey = (script && script.getAttribute("data-api-key")) || "okike-live-secret-2026";
+  var userId = (script && script.getAttribute("data-user-id")) || "3206f2b2-c05d-485c-9361-ee0946a7efb1";
+  var platform = (script && script.getAttribute("data-platform")) || window.location.hostname || "okikeenterprises.com";
 
   var container = document.createElement("div");
   container.id = "okike-ziri-widget";
