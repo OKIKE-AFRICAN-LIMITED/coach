@@ -305,6 +305,7 @@ function VoiceCallModal({
   activeToolName,
   onToggleMute,
   onInterrupt,
+  onForceSend,
   onMinimize,
   onEndCall,
 }: {
@@ -317,6 +318,7 @@ function VoiceCallModal({
   activeToolName: string | null;
   onToggleMute: () => void;
   onInterrupt: () => void;
+  onForceSend: () => void;
   onMinimize: () => void;
   onEndCall: () => void;
 }) {
@@ -439,7 +441,13 @@ function VoiceCallModal({
 
           {/* Core Luxury Orb */}
           <div
-            onClick={callState === "speaking" ? onInterrupt : undefined}
+            onClick={
+              callState === "speaking"
+                ? onInterrupt
+                : callState === "listening" && liveTranscript.trim().length > 0
+                  ? onForceSend
+                  : undefined
+            }
             className={`relative h-32 w-32 sm:h-36 sm:w-36 rounded-full flex flex-col items-center justify-center transition-all duration-150 shadow-[0_0_50px_rgba(212,175,55,0.35)] border ${
               callState === "speaking"
                 ? "bg-gradient-to-br from-[#F5E0A3] via-[#D4AF37] to-[#8C6508] border-[#FFF3C4] cursor-pointer"
@@ -447,7 +455,9 @@ function VoiceCallModal({
                   ? "bg-gradient-to-br from-[#141829] via-[#0F111A] to-[#050507] border-blue-400/50"
                   : micMuted
                     ? "bg-[#141624] border-red-500/40"
-                    : "bg-gradient-to-br from-[#1B1810] via-[#0F111A] to-[#050507] border-[#D4AF37]/60"
+                    : liveTranscript.trim().length > 0
+                      ? "bg-gradient-to-br from-[#1B1810] via-[#0F111A] to-[#050507] border-emerald-400 cursor-pointer"
+                      : "bg-gradient-to-br from-[#1B1810] via-[#0F111A] to-[#050507] border-[#D4AF37]/60"
             }`}
             style={{ transform: `scale(${Math.max(0.92, Math.min(1.18, dynamicScale))})` }}
           >
@@ -542,6 +552,19 @@ function VoiceCallModal({
           >
             <Hand className="h-4 w-4" />
             <span>Interrupt</span>
+          </button>
+        )}
+
+        {/* Tap to Send Immediately (Active when words are heard in noisy environments) */}
+        {callState === "listening" && liveTranscript.trim().length > 0 && (
+          <button
+            type="button"
+            onClick={onForceSend}
+            className="h-14 px-6 rounded-full flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-[#050507] text-xs font-bold uppercase tracking-wider transition-all shadow-[0_0_25px_rgba(16,185,129,0.35)] cursor-pointer animate-in fade-in"
+            title="Send spoken words now"
+          >
+            <Sparkles className="h-4 w-4" />
+            <span>Send Now</span>
           </button>
         )}
 
@@ -672,6 +695,8 @@ function Chat({
   const callStateRef = useRef<"idle" | "listening" | "thinking" | "speaking">("idle");
   const callRecRef = useRef<ISpeechRecognition | null>(null);
   const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingTranscriptRef = useRef("");
 
   const setCallStateSynced = useCallback(
     (s: "idle" | "listening" | "thinking" | "speaking") => {
@@ -685,6 +710,37 @@ function Chat({
   const [voiceOn, setVoiceOn] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const spokenRef = useRef<Set<string>>(new Set(initial.map((m) => m.id)));
+
+  /** Commits and sends the accumulated spoken transcript even if background music prevented isFinal */
+  const commitSpokenTranscript = useCallback(
+    async (rawText: string, startListeningFn: () => void) => {
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+      const text = rawText.trim();
+      if (!text || callStateRef.current === "thinking") return;
+
+      pendingTranscriptRef.current = "";
+      setLiveTranscript(text);
+      setCallStateSynced("thinking");
+      try {
+        callRecRef.current?.abort();
+      } catch {
+        /* ignore */
+      }
+      callRecRef.current = null;
+
+      try {
+        await sendMessage({ text });
+      } catch {
+        setLiveTranscript("");
+        setCallStateSynced("listening");
+        setTimeout(() => startListeningFn(), 350);
+      }
+    },
+    [sendMessage, setCallStateSynced],
+  );
 
   /** Starts one SpeechRecognition session. On end, re-arms itself unless stopped or muted. */
   const startListening = useCallback(() => {
@@ -702,44 +758,42 @@ function Chat({
     callRecRef.current = null;
 
     const r = new SR();
-    r.continuous = false;
+    r.continuous = true;
     r.interimResults = true;
     r.lang = "en-US";
 
     r.onresult = async (e: SpeechRecognitionEvent) => {
-      if (micMutedRef.current) return;
+      if (micMutedRef.current || callStateRef.current === "thinking") return;
 
-      // Barge-in: stop TTS if user starts speaking
-      if (audioRef.current && !audioRef.current.paused) {
-        audioRef.current.pause();
+      let combined = "";
+      let hasFinal = false;
+      for (let i = 0; i < e.results.length; i++) {
+        combined += e.results[i][0].transcript + " ";
+        if (e.results[i].isFinal) {
+          hasFinal = true;
+        }
       }
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
+      const cleanCombined = combined.trim();
+      if (!cleanCombined) return;
+
+      pendingTranscriptRef.current = cleanCombined;
+      setLiveTranscript(cleanCombined);
+
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
       }
 
-      let combinedInterim = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        combinedInterim += e.results[i][0].transcript;
-      }
-      setLiveTranscript(combinedInterim.trim());
-
-      const last = e.results[e.results.length - 1];
-      if (!last.isFinal) return;
-
-      const text = last[0].transcript.trim();
-      if (!text) return;
-
-      setLiveTranscript(text);
-      setCallStateSynced("thinking");
-      try { r.abort(); } catch { /* ignore */ }
-      callRecRef.current = null;
-
-      try {
-        await sendMessage({ text });
-      } catch {
-        setLiveTranscript("");
-        setCallStateSynced("listening");
-        setTimeout(() => startListening(), 350);
+      if (hasFinal) {
+        // Browser detected a natural sentence end — wait 650ms in case user keeps talking, then send
+        silenceTimerRef.current = setTimeout(() => {
+          void commitSpokenTranscript(pendingTranscriptRef.current, startListening);
+        }, 650);
+      } else {
+        // Even with background music preventing isFinal, auto-send after 1.7s of no new words!
+        silenceTimerRef.current = setTimeout(() => {
+          void commitSpokenTranscript(pendingTranscriptRef.current, startListening);
+        }, 1700);
       }
     };
 
@@ -748,6 +802,11 @@ function Chat({
       if (!callActiveRef.current || micMutedRef.current) return;
       const state = callStateRef.current;
       if (state === "thinking" || state === "speaking") return;
+      // If browser ended the session while we had buffered words (e.g. background noise timeout), send them!
+      if (pendingTranscriptRef.current.trim().length > 0) {
+        void commitSpokenTranscript(pendingTranscriptRef.current, startListening);
+        return;
+      }
       setTimeout(() => startListening(), 250);
     };
 
@@ -769,7 +828,7 @@ function Chat({
       callRecRef.current = null;
       setTimeout(() => startListening(), 400);
     }
-  }, [sendMessage, setCallStateSynced]);
+  }, [commitSpokenTranscript, setCallStateSynced]);
 
   /** Browser native speechSynthesis fallback if Gemini TTS is rate-limited or offline */
   const speakWithBrowserFallback = useCallback(
@@ -940,6 +999,11 @@ function Chat({
   const stopCall = useCallback(() => {
     callActiveRef.current = false;
     micMutedRef.current = false;
+    pendingTranscriptRef.current = "";
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
     if (watchdogRef.current) {
       clearInterval(watchdogRef.current);
       watchdogRef.current = null;
@@ -1027,9 +1091,16 @@ function Chat({
     return null;
   }, [messages]);
 
-  // Live microphone volume metering
+  const forceSendTranscript = useCallback(() => {
+    const text = pendingTranscriptRef.current || liveTranscript;
+    if (text.trim()) {
+      void commitSpokenTranscript(text, startListening);
+    }
+  }, [liveTranscript, commitSpokenTranscript, startListening]);
+
+  // Live microphone volume metering — keep stream open during call so getUserMedia doesn't fight SpeechRecognition
   const isMicMeteringActive =
-    recording || (callActive && callState === "listening" && !micMuted);
+    recording || (callActive && !micMuted);
   const micVolume = useMicVolume(isMicMeteringActive);
 
   return (
@@ -1053,6 +1124,7 @@ function Chat({
         activeToolName={activeToolName}
         onToggleMute={toggleMicMute}
         onInterrupt={interruptSpeech}
+        onForceSend={forceSendTranscript}
         onMinimize={() => setCallModalOpen(false)}
         onEndCall={stopCall}
       />
