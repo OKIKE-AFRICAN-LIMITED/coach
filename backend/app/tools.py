@@ -23,6 +23,14 @@ def get_google_access_token_sync(ctx: AuthContext) -> str:
             "Google account not connected. Please connect Google Workspace in Settings."
         )
 
+    if refresh_token.startswith("ya29."):
+        with httpx.Client(timeout=8.0) as client:
+            chk = client.get(
+                f"https://www.googleapis.com/oauth2/v2/tokeninfo?access_token={quote(refresh_token)}"
+            )
+            if chk.status_code == 200:
+                return refresh_token
+
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
         raise RuntimeError("Server missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET.")
 

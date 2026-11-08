@@ -203,8 +203,28 @@ function AuthedLayout() {
   }, [hookSnooze]);
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+    // Capture Google OAuth provider_token / provider_refresh_token on any authenticated route
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      const tokenToSave = session?.provider_refresh_token || session?.provider_token;
+      if (tokenToSave) {
+        try {
+          await supabase.rpc("set_google_refresh_token", { token: tokenToSave });
+        } catch {
+          // ignore
+        }
+      }
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_OUT") router.navigate({ to: "/auth", replace: true });
+      const tokenToSave = session?.provider_refresh_token || session?.provider_token;
+      if (tokenToSave) {
+        try {
+          await supabase.rpc("set_google_refresh_token", { token: tokenToSave });
+        } catch {
+          // ignore
+        }
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, [router]);

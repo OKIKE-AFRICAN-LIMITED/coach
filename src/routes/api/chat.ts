@@ -41,6 +41,14 @@ export const Route = createFileRoute("/api/chat")({
           return new Response("Unauthorized", { status: 401 });
         }
         const userId = claims.claims.sub;
+        const liveGoogleToken = request.headers.get("x-google-access-token") ?? undefined;
+        const resolveGoogleToken = async () => {
+          if (liveGoogleToken && liveGoogleToken.startsWith("ya29.")) {
+            const check = await fetch("https://www.googleapis.com/oauth2/v2/tokeninfo?access_token=" + encodeURIComponent(liveGoogleToken));
+            if (check.ok) return liveGoogleToken;
+          }
+          return getGoogleAccessToken(supabase, userId);
+        };
 
         const body = (await request.json()) as {
           messages: UIMessage[];
@@ -352,7 +360,7 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
               }),
               execute: async ({ hoursAhead, maxResults }) => {
                 try {
-                  const token = await getGoogleAccessToken(supabase, userId);
+                  const token = await resolveGoogleToken();
                   const timeMin = new Date().toISOString();
                   const timeMax = new Date(Date.now() + hoursAhead * 3600 * 1000).toISOString();
                   const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults=${maxResults}&timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`;
@@ -386,7 +394,7 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
               }),
               execute: async ({ summary, description, startISO, endISO, location }) => {
                 try {
-                  const token = await getGoogleAccessToken(supabase, userId);
+                  const token = await resolveGoogleToken();
                   const res = await fetch(
                     "https://www.googleapis.com/calendar/v3/calendars/primary/events",
                     {
@@ -424,7 +432,7 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
               }),
               execute: async ({ eventId, summary, description, startISO, endISO, location }) => {
                 try {
-                  const token = await getGoogleAccessToken(supabase, userId);
+                  const token = await resolveGoogleToken();
                   const patchData: Record<string, unknown> = {};
                   if (summary !== undefined) patchData.summary = summary;
                   if (description !== undefined) patchData.description = description;
@@ -458,7 +466,7 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
               }),
               execute: async ({ eventId }) => {
                 try {
-                  const token = await getGoogleAccessToken(supabase, userId);
+                  const token = await resolveGoogleToken();
                   const res = await fetch(
                     `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`,
                     {
@@ -483,7 +491,7 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
               }),
               execute: async ({ timeMinISO, timeMaxISO }) => {
                 try {
-                  const token = await getGoogleAccessToken(supabase, userId);
+                  const token = await resolveGoogleToken();
                   const res = await fetch("https://www.googleapis.com/calendar/v3/freeBusy", {
                     method: "POST",
                     headers: {
@@ -513,7 +521,7 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
               }),
               execute: async ({ query, maxResults }) => {
                 try {
-                  const token = await getGoogleAccessToken(supabase, userId);
+                  const token = await resolveGoogleToken();
                   const base = "https://gmail.googleapis.com/gmail/v1/users/me";
                   const headers = { Authorization: `Bearer ${token}` };
                   const list = await fetch(`${base}/messages?maxResults=${maxResults}&q=${encodeURIComponent(query)}`, { headers });
@@ -549,7 +557,7 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
               }),
               execute: async ({ messageId }) => {
                 try {
-                  const token = await getGoogleAccessToken(supabase, userId);
+                  const token = await resolveGoogleToken();
                   const res = await fetch(
                     `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}?format=full`,
                     { headers: { Authorization: `Bearer ${token}` } },
@@ -581,7 +589,7 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
               }),
               execute: async ({ to, subject, body: emailBody }) => {
                 try {
-                  const token = await getGoogleAccessToken(supabase, userId);
+                  const token = await resolveGoogleToken();
                   const rfc = [`To: ${to}`, `Subject: ${subject}`, 'Content-Type: text/plain; charset="UTF-8"', "", emailBody].join("\r\n");
                   const raw = Buffer.from(rfc).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
                   const res = await fetch(
@@ -612,7 +620,7 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
               }),
               execute: async ({ to, subject, threadId, body: emailBody }) => {
                 try {
-                  const token = await getGoogleAccessToken(supabase, userId);
+                  const token = await resolveGoogleToken();
                   const replySubject = subject.toLowerCase().startsWith("re:") ? subject : `Re: ${subject}`;
                   const rfc = [`To: ${to}`, `Subject: ${replySubject}`, 'Content-Type: text/plain; charset="UTF-8"', "", emailBody].join("\r\n");
                   const raw = Buffer.from(rfc).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");

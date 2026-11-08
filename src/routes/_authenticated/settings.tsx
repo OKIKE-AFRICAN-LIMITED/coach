@@ -107,38 +107,18 @@ function SettingsPage() {
   async function connectGoogle() {
     setConnecting(true);
     try {
-      // Get the current user's session token to pass in state so the callback
-      // can identify which user to save the refresh token for
-      const { data: { session } } = await supabase.auth.getSession();
-      const userToken = session?.access_token ?? "";
-
-      const clientId = GOOGLE_CLIENT_ID ?? import.meta.env.VITE_GOOGLE_CLIENT_ID;
-      if (!clientId) {
-        toast.error("Google Client ID not configured. Add VITE_GOOGLE_CLIENT_ID to .env");
-        setConnecting(false);
-        return;
-      }
-
-      const state = btoa(JSON.stringify({
-        token: userToken,
-        redirect: `${window.location.origin}/settings`,
-      }));
-
-      const params = new URLSearchParams({
-        client_id: clientId,
-        redirect_uri: `${window.location.origin}/api/google-callback`,
-        response_type: "code",
-        scope: [
-          "https://www.googleapis.com/auth/calendar",
-          "https://www.googleapis.com/auth/gmail.modify",
-          "https://www.googleapis.com/auth/userinfo.email",
-        ].join(" "),
-        access_type: "offline",
-        prompt: "consent",
-        state,
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/settings?google_connected=1`,
+          scopes: "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/gmail.modify",
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent",
+          },
+        },
       });
-
-      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+      if (error) throw error;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to initiate Google sign-in");
       setConnecting(false);

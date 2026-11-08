@@ -17,6 +17,16 @@ export async function getGoogleAccessToken(
     throw new Error("Google account not connected. Please connect Google Workspace in Settings.");
   }
 
+  const storedToken = data.google_refresh_token;
+
+  // If the stored token is a live Google OAuth access token (ya29....), verify if it's still active
+  if (storedToken.startsWith("ya29.")) {
+    const check = await fetch("https://www.googleapis.com/oauth2/v2/tokeninfo?access_token=" + encodeURIComponent(storedToken));
+    if (check.ok) {
+      return storedToken;
+    }
+  }
+
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
@@ -30,13 +40,15 @@ export async function getGoogleAccessToken(
     body: new URLSearchParams({
       client_id: clientId,
       client_secret: clientSecret,
-      refresh_token: data.google_refresh_token,
+      refresh_token: storedToken,
       grant_type: "refresh_token",
     }),
   });
 
   if (!response.ok) {
-    throw new Error("Failed to refresh Google Access Token. Please re-connect your Google account in Settings.");
+    const errBody = await response.json().catch(() => ({})) as { error?: string; error_description?: string };
+    const detail = errBody.error_description || errBody.error || `HTTP ${response.status}`;
+    throw new Error(`Failed to refresh Google Access Token (${detail}). Please check GOOGLE_CLIENT_SECRET or re-connect in Settings.`);
   }
 
   const tokenData = await response.json();

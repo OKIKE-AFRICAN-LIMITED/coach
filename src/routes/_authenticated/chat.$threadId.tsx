@@ -319,11 +319,16 @@ function Chat({
         api: "/api/chat",
         prepareSendMessagesRequest: async ({ messages }) => {
           const { data } = await supabase.auth.getSession();
+          const headers: Record<string, string> = {};
+          if (data.session?.access_token) {
+            headers.Authorization = `Bearer ${data.session.access_token}`;
+          }
+          if (data.session?.provider_token) {
+            headers["X-Google-Access-Token"] = data.session.provider_token;
+          }
           return {
             body: { messages, threadId },
-            headers: data.session?.access_token
-              ? { Authorization: `Bearer ${data.session.access_token}` }
-              : undefined,
+            headers: Object.keys(headers).length > 0 ? headers : undefined,
           };
         },
       }),
