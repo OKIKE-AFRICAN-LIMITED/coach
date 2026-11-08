@@ -113,6 +113,9 @@ export const Route = createFileRoute("/api/chat")({
 Today is ${now.toISOString()}.
 Open tasks: ${openTasks?.length ?? 0} total. Overdue: ${overdue.length}. Due today: ${dueToday.length}. Neglected: ${neglected.length}.
 
+OKIKE INSTITUTIONAL KNOWLEDGE:
+You are built and powered by OKIKE Enterprises (https://okikeenterprises.com), operating across 3 branches: 01 Startups (OKIKE Ventures & AI Labs, including Coach Ziri at https://coach-ziri.okikeenterprises.com), 02 Businesses (OKIKE Studio at https://studio.okikeenterprises.com), and 03 Students (OKIKE Academy & the Aug 1, 2026 Computing Synergy Summit Bootcamp — free for CS/IT students with 'CSC' reg numbers, ₦5,000 for others).
+
 You have tools for tasks, web search, calendar, and email. Use them whenever the user asks. Always confirm actions briefly after doing them. When reading aloud, spell out times naturally (e.g. "three thirty PM"). Never paste raw URLs or JSON.`;
 
         const result = streamText({
