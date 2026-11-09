@@ -142,7 +142,7 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
               baseURL: "https://api.groq.com/openai/v1",
               headers: { Authorization: `Bearer ${GROQ_API_KEY}` },
             })(groqModelName)
-          : google("gemini-3.8-flash");
+          : google("gemini-3-flash-preview");
 
         const validMessages = body.messages.filter(
           (m) => Array.isArray(m.parts) && m.parts.length > 0
@@ -730,6 +730,10 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
 
         return result.toUIMessageStreamResponse({
           originalMessages: body.messages,
+          onError: (err) => {
+            console.error("[toUIMessageStreamResponse error]:", err);
+            return err instanceof Error ? err.message : String(err);
+          },
           onFinish: async ({ messages }) => {
             if (isTemporary) return; // Do not persist temporary/incognito chat turns
             const last = messages[messages.length - 1];
