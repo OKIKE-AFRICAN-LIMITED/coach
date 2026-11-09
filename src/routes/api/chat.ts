@@ -8,7 +8,6 @@ import {
 } from "ai";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
-import { google } from "@ai-sdk/google";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { Database } from "@/integrations/supabase/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -36,11 +35,10 @@ export const Route = createFileRoute("/api/chat")({
         const token = auth.slice("Bearer ".length);
         const SUPABASE_URL = process.env.SUPABASE_URL!;
         const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY!;
-        const GOOGLE_GENERATIVE_AI_API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
         const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-        if (!GOOGLE_GENERATIVE_AI_API_KEY && !GROQ_API_KEY) {
-          return new Response("Missing AI API credentials", { status: 500 });
+        if (!GROQ_API_KEY) {
+          return new Response("Missing GROQ_API_KEY environment variable. Please configure GROQ_API_KEY in your environment.", { status: 500 });
         }
 
         const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
@@ -135,14 +133,13 @@ You are built and powered by OKIKE Enterprises (https://okikeenterprises.com), o
 You have tools for tasks, web search, calendar, and email. Use them whenever the user asks. Always confirm actions briefly after doing them. When reading aloud, spell out times naturally (e.g. "three thirty PM"). Never paste raw URLs or JSON.`;
 
         const groqModelName = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
-        console.log("[api/chat] GROQ_API_KEY present:", Boolean(GROQ_API_KEY), "Model:", groqModelName);
-        const activeModel = GROQ_API_KEY
-          ? createOpenAICompatible({
-              name: "groq",
-              baseURL: "https://api.groq.com/openai/v1",
-              headers: { Authorization: `Bearer ${GROQ_API_KEY}` },
-            })(groqModelName)
-          : google("gemini-3-flash-preview");
+        console.log("[api/chat] Using Groq Model:", groqModelName);
+        const groq = createOpenAICompatible({
+          name: "groq",
+          baseURL: "https://api.groq.com/openai/v1",
+          headers: { Authorization: `Bearer ${GROQ_API_KEY}` },
+        });
+        const activeModel = groq(groqModelName);
 
         const validMessages = body.messages.filter(
           (m) => Array.isArray(m.parts) && m.parts.length > 0
