@@ -15,6 +15,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getGoogleAccessToken } from "@/lib/google.functions";
 
+try {
+  // Always load live .env file in Node runtime so keys are never stale
+  if (typeof process.loadEnvFile === "function") {
+    process.loadEnvFile();
+  }
+} catch {
+  // ignore
+}
+
 
 export const Route = createFileRoute("/api/chat")({
   server: {
@@ -55,33 +64,38 @@ export const Route = createFileRoute("/api/chat")({
         const body = (await request.json()) as {
           messages: UIMessage[];
           threadId: string;
+          isTemporary?: boolean;
         };
-        if (!body.threadId) return new Response("Missing threadId", { status: 400 });
+        const isTemporary = Boolean(body.isTemporary || body.threadId === "temp");
 
-        // Verify thread ownership and persist the last user message
-        const { data: thread, error: threadErr } = await supabase
-          .from("chat_threads")
-          .select("id, title")
-          .eq("id", body.threadId)
-          .maybeSingle();
-        if (threadErr || !thread) return new Response("Thread not found", { status: 404 });
+        if (!isTemporary) {
+          if (!body.threadId) return new Response("Missing threadId", { status: 400 });
 
-        const lastUser = [...body.messages].reverse().find((m) => m.role === "user");
-        if (lastUser) {
-          await supabase.from("chat_messages").insert({
-            thread_id: body.threadId,
-            user_id: userId,
-            role: "user",
-            parts: lastUser.parts as unknown as Database["public"]["Tables"]["chat_messages"]["Insert"]["parts"],
-          });
-          // Auto-title from first user message
-          if (thread.title === "New chat") {
-            const text = lastUser.parts
-              .map((p) => (p.type === "text" ? p.text : ""))
-              .join(" ")
-              .slice(0, 80);
-            if (text) {
-              await supabase.from("chat_threads").update({ title: text }).eq("id", body.threadId);
+          // Verify thread ownership and persist the last user message
+          const { data: thread, error: threadErr } = await supabase
+            .from("chat_threads")
+            .select("id, title")
+            .eq("id", body.threadId)
+            .maybeSingle();
+          if (threadErr || !thread) return new Response("Thread not found", { status: 404 });
+
+          const lastUser = [...body.messages].reverse().find((m) => m.role === "user");
+          if (lastUser) {
+            await supabase.from("chat_messages").insert({
+              thread_id: body.threadId,
+              user_id: userId,
+              role: "user",
+              parts: lastUser.parts as unknown as Database["public"]["Tables"]["chat_messages"]["Insert"]["parts"],
+            });
+            // Auto-title from first user message
+            if (thread.title === "New chat") {
+              const text = lastUser.parts
+                .map((p) => (p.type === "text" ? p.text : ""))
+                .join(" ")
+                .slice(0, 80);
+              if (text) {
+                await supabase.from("chat_threads").update({ title: text }).eq("id", body.threadId);
+              }
             }
           }
         }
@@ -121,6 +135,7 @@ You are built and powered by OKIKE Enterprises (https://okikeenterprises.com), o
 You have tools for tasks, web search, calendar, and email. Use them whenever the user asks. Always confirm actions briefly after doing them. When reading aloud, spell out times naturally (e.g. "three thirty PM"). Never paste raw URLs or JSON.`;
 
         const groqModelName = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
+        console.log("[api/chat] GROQ_API_KEY present:", Boolean(GROQ_API_KEY), "Model:", groqModelName);
         const activeModel = GROQ_API_KEY
           ? createOpenAICompatible({
               name: "groq",
@@ -129,11 +144,44 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
             })(groqModelName)
           : google("gemini-3.8-flash");
 
+        const validMessages = body.messages.filter(
+          (m) => Array.isArray(m.parts) && m.parts.length > 0
+        );
+
+        // Sliding window: keep the last 10 messages to avoid token limit errors
+        let trimmed = validMessages.slice(-10);
+        while (trimmed.length > 0 && trimmed[0].role !== "user") {
+          trimmed = trimmed.slice(1);
+        }
+        if (trimmed.length === 0 && validMessages.length > 0) {
+          trimmed = validMessages.slice(-1);
+        }
+
+        // Deduplicate consecutive user messages if retried repeatedly
+        const dedupedMessages: typeof validMessages = [];
+        for (const m of trimmed) {
+          if (
+            dedupedMessages.length > 0 &&
+            dedupedMessages[dedupedMessages.length - 1].role === "user" &&
+            m.role === "user"
+          ) {
+            dedupedMessages[dedupedMessages.length - 1] = m;
+          } else {
+            dedupedMessages.push(m);
+          }
+        }
+
+        const modelMessages = await convertToModelMessages(dedupedMessages);
+        console.log("[api/chat] Final model messages count:", modelMessages.length);
+
         const result = streamText({
           model: activeModel,
           system,
-          messages: await convertToModelMessages(body.messages),
+          messages: modelMessages,
           stopWhen: stepCountIs(50),
+          onError: (err) => {
+            console.error("[api/chat streamText onError]:", err);
+          },
           tools: {
             list_tasks: tool({
               description: "List the user's tasks, optionally filtered by status.",
@@ -531,31 +579,52 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
               description: "Search the user's Gmail inbox. Returns email IDs, subjects, and snippets.",
               inputSchema: z.object({
                 query: z.string().max(200).default("is:unread").describe("Gmail search query"),
-                maxResults: z.number().int().min(1).max(15).default(5),
+                maxResults: z.number().int().min(1).max(10).default(3),
               }),
-              execute: async ({ query, maxResults }) => {
+              execute: async ({ query, maxResults = 3 }) => {
                 try {
                   const token = await resolveGoogleToken();
                   const base = "https://gmail.googleapis.com/gmail/v1/users/me";
                   const headers = { Authorization: `Bearer ${token}` };
-                  const list = await fetch(`${base}/messages?maxResults=${maxResults}&q=${encodeURIComponent(query)}`, { headers });
+                  const targetCount = Math.min(maxResults, 5);
+                  
+                  const controller = new AbortController();
+                  const timer = setTimeout(() => controller.abort(), 6000);
+
+                  const list = await fetch(`${base}/messages?maxResults=${targetCount}&q=${encodeURIComponent(query)}`, {
+                    headers,
+                    signal: controller.signal,
+                  });
+                  clearTimeout(timer);
+
                   if (!list.ok) return { error: `Gmail error ${list.status}` };
                   const { messages = [] } = await list.json();
                   const details = await Promise.all(
-                    (messages as { id: string; threadId: string }[]).slice(0, maxResults).map(async (m) => {
-                      const r = await fetch(`${base}/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`, { headers });
-                      if (!r.ok) return null;
-                      const d = await r.json();
-                      const h = (d.payload?.headers ?? []) as { name: string; value: string }[];
-                      const get = (n: string) => h.find((x) => x.name.toLowerCase() === n.toLowerCase())?.value;
-                      return {
-                        id: m.id,
-                        threadId: m.threadId,
-                        from: get("From"),
-                        subject: get("Subject"),
-                        date: get("Date"),
-                        snippet: d.snippet,
-                      };
+                    (messages as { id: string; threadId: string }[]).slice(0, targetCount).map(async (m) => {
+                      const itemCtrl = new AbortController();
+                      const itemTimer = setTimeout(() => itemCtrl.abort(), 4000);
+                      try {
+                        const r = await fetch(`${base}/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`, {
+                          headers,
+                          signal: itemCtrl.signal,
+                        });
+                        clearTimeout(itemTimer);
+                        if (!r.ok) return null;
+                        const d = await r.json();
+                        const h = (d.payload?.headers ?? []) as { name: string; value: string }[];
+                        const get = (n: string) => h.find((x) => x.name.toLowerCase() === n.toLowerCase())?.value;
+                        return {
+                          id: m.id,
+                          threadId: m.threadId,
+                          from: get("From"),
+                          subject: get("Subject"),
+                          date: get("Date"),
+                          snippet: (d.snippet || "").slice(0, 160),
+                        };
+                      } catch {
+                        clearTimeout(itemTimer);
+                        return null;
+                      }
                     }),
                   );
                   return { emails: details.filter(Boolean) };
@@ -662,8 +731,9 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
         return result.toUIMessageStreamResponse({
           originalMessages: body.messages,
           onFinish: async ({ messages }) => {
+            if (isTemporary) return; // Do not persist temporary/incognito chat turns
             const last = messages[messages.length - 1];
-            if (last && last.role === "assistant") {
+            if (last && last.role === "assistant" && Array.isArray(last.parts) && last.parts.length > 0) {
               await supabase.from("chat_messages").insert({
                 thread_id: body.threadId,
                 user_id: userId,

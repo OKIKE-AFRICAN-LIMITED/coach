@@ -36,11 +36,18 @@ interface ISpeechRecognition extends EventTarget {
 }
 type SpeechRecognitionCtor = new () => ISpeechRecognition;
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { getThreadMessages } from "@/lib/threads.functions";
+import {
+  getThreadMessages,
+  listThreads,
+  createThread,
+  deleteThread,
+  renameThread,
+} from "@/lib/threads.functions";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Conversation,
@@ -70,6 +77,14 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Mic,
   MicOff,
   Square,
@@ -80,6 +95,15 @@ import {
   Sparkles,
   Minimize2,
   Hand,
+  Plus,
+  Trash2,
+  Ghost,
+  ChevronDown,
+  ArrowLeft,
+  MessageSquare,
+  Edit2,
+  Check,
+  X,
 } from "lucide-react";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -591,14 +615,42 @@ export const Route = createFileRoute("/_authenticated/chat/$threadId")({
 
 function ChatThreadPage() {
   const { threadId } = Route.useParams();
+  const navigate = useNavigate();
+  const createT = useServerFn(createThread);
+  const creatingRef = useRef(false);
+
+  useEffect(() => {
+    if (threadId === "new" && !creatingRef.current) {
+      creatingRef.current = true;
+      createT({ data: { title: "New chat" } })
+        .then((t) => {
+          navigate({ to: "/chat/$threadId", params: { threadId: t.id }, replace: true });
+        })
+        .catch(() => {
+          creatingRef.current = false;
+        });
+    }
+  }, [threadId, createT, navigate]);
+
+  if (threadId === "new") {
+    return (
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center text-sm text-[#8A8F9E]">
+        <Sparkles className="h-4 w-4 text-[#D4AF37] animate-spin mr-2" />
+        Starting a fresh chat…
+      </div>
+    );
+  }
+
   return <ChatWindow key={threadId} threadId={threadId} />;
 }
 
 function ChatWindow({ threadId }: { threadId: string }) {
+  const isTemporary = threadId === "temp";
   const getMsgs = useServerFn(getThreadMessages);
   const msgsQ = useQuery({
     queryKey: ["thread-messages", threadId],
-    queryFn: () => getMsgs({ data: { threadId } }),
+    queryFn: () => (isTemporary ? Promise.resolve([]) : getMsgs({ data: { threadId } })),
+    enabled: !isTemporary,
   });
 
   const initial = useMemo<UIMessage[]>(
@@ -611,7 +663,7 @@ function ChatWindow({ threadId }: { threadId: string }) {
     [msgsQ.data],
   );
 
-  if (msgsQ.isLoading) {
+  if (!isTemporary && msgsQ.isLoading) {
     return (
       <div className="p-8 text-sm text-muted-foreground">
         Loading conversation…
@@ -619,7 +671,7 @@ function ChatWindow({ threadId }: { threadId: string }) {
     );
   }
 
-  return <Chat threadId={threadId} initial={initial} />;
+  return <Chat threadId={threadId} initial={initial} isTemporary={isTemporary} />;
 }
 
 // ─── Main Chat Component ─────────────────────────────────────────────────────
@@ -627,10 +679,64 @@ function ChatWindow({ threadId }: { threadId: string }) {
 function Chat({
   threadId,
   initial,
+  isTemporary = false,
 }: {
   threadId: string;
   initial: UIMessage[];
+  isTemporary?: boolean;
 }) {
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const listT = useServerFn(listThreads);
+  const createT = useServerFn(createThread);
+  const deleteT = useServerFn(deleteThread);
+  const renameT = useServerFn(renameThread);
+
+  const threadsQ = useQuery({
+    queryKey: ["threads"],
+    queryFn: () => listT(),
+  });
+
+  const currentThread = (threadsQ.data ?? []).find((t) => t.id === threadId);
+
+  const handleStartNewChat = useCallback(async () => {
+    try {
+      const t = await createT({ data: { title: "New chat" } });
+      qc.invalidateQueries({ queryKey: ["threads"] });
+      navigate({ to: "/chat/$threadId", params: { threadId: t.id } });
+      toast.success("New conversation started");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to create new chat");
+    }
+  }, [createT, navigate, qc]);
+
+  const handleDeleteCurrentThread = useCallback(async () => {
+    if (isTemporary || !currentThread) return;
+    if (!window.confirm(`Delete "${currentThread.title}"? This cannot be undone.`)) return;
+    try {
+      await deleteT({ data: { id: threadId } });
+      qc.invalidateQueries({ queryKey: ["threads"] });
+      toast.success("Conversation deleted");
+      const remaining = (threadsQ.data ?? []).filter((t) => t.id !== threadId);
+      if (remaining.length > 0) {
+        navigate({ to: "/chat/$threadId", params: { threadId: remaining[0].id } });
+      } else {
+        handleStartNewChat();
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete chat");
+    }
+  }, [isTemporary, currentThread, deleteT, threadId, qc, threadsQ.data, navigate, handleStartNewChat]);
+
+  const handleExitTemporaryChat = useCallback(() => {
+    const saved = (threadsQ.data ?? [])[0];
+    if (saved) {
+      navigate({ to: "/chat/$threadId", params: { threadId: saved.id } });
+    } else {
+      handleStartNewChat();
+    }
+  }, [threadsQ.data, navigate, handleStartNewChat]);
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -645,19 +751,23 @@ function Chat({
             headers["X-Google-Access-Token"] = data.session.provider_token;
           }
           return {
-            body: { messages, threadId },
+            body: { messages, threadId, isTemporary },
             headers: Object.keys(headers).length > 0 ? headers : undefined,
           };
         },
       }),
-    [threadId],
+    [threadId, isTemporary],
   );
 
   const { messages, sendMessage, status } = useChat({
     id: threadId,
     messages: initial,
     transport,
-    onError: (e) => toast.error(e.message),
+    onError: (e) => {
+      console.error("[Coach Ziri Chat Error]:", e);
+      if (e.message?.toLowerCase().includes("abort") || e.name === "AbortError") return;
+      toast.error(e.message || "An error occurred.");
+    },
   });
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1184,7 +1294,7 @@ function Chat({
   const micVolume = useMicVolume(isMicMeteringActive);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3rem)]">
+    <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
       {/* Hidden audio element for TTS playback */}
       <audio
         ref={audioRef}
@@ -1192,6 +1302,165 @@ function Chat({
         className="h-0 w-0 opacity-0"
         tabIndex={-1}
       />
+
+      {/* Top Chat Header: Thread Switcher, New Chat, Temporary Chat Toggle */}
+      <div className="h-12 border-b border-[#1F2336] px-3 sm:px-4 flex items-center justify-between shrink-0 bg-[#090A10]/95 backdrop-blur-md z-10">
+        {/* Left Controls */}
+        <div className="flex items-center gap-2 min-w-0">
+          {isTemporary ? (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-semibold">
+              <Ghost className="h-3.5 w-3.5 text-amber-400 animate-pulse" />
+              <span>Temporary Chat</span>
+              <span className="hidden sm:inline text-[10px] text-amber-400/80 font-normal">
+                (Unsaved)
+              </span>
+            </div>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-[#141624] text-xs font-semibold text-white max-w-[170px] sm:max-w-xs truncate border border-transparent hover:border-[#2A2E44] transition-all text-left"
+                >
+                  <MessageSquare className="h-3.5 w-3.5 text-[#D4AF37] shrink-0" />
+                  <span className="truncate">{currentThread?.title || "Current Chat"}</span>
+                  <ChevronDown className="h-3 w-3 text-[#8A8F9E] shrink-0" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="w-72 max-h-80 overflow-y-auto bg-[#0E101A] border border-[#1F2336] text-white p-1"
+              >
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-[#6C7180] px-2 py-1 flex items-center justify-between">
+                  <span>Your Conversations</span>
+                  <span className="font-mono text-[9px] text-[#A0A5B5]">
+                    {threadsQ.data?.length ?? 0} saved
+                  </span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-[#1F2336]" />
+                {(threadsQ.data ?? []).map((t) => (
+                  <DropdownMenuItem
+                    key={t.id}
+                    onClick={() => navigate({ to: "/chat/$threadId", params: { threadId: t.id } })}
+                    className={`flex items-center justify-between text-xs px-2.5 py-2 cursor-pointer rounded-lg transition-colors ${
+                      t.id === threadId
+                        ? "bg-[#1A1810] text-[#F5E0A3] font-semibold border border-[#D4AF37]/30"
+                        : "text-[#D1D5DB] hover:bg-[#141624] hover:text-white"
+                    }`}
+                  >
+                    <span className="truncate pr-2">{t.title}</span>
+                    {t.id === threadId && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#D4AF37] shrink-0" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          {/* New Chat Button */}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleStartNewChat}
+            className="h-7 px-2.5 text-xs rounded-lg border-[#2A2E44] bg-[#0E101A] hover:bg-[#1A1810] hover:border-[#D4AF37]/40 text-[#E5C185] hover:text-white transition-all flex items-center gap-1 shrink-0"
+            title="Start a new chat thread"
+          >
+            <Plus className="h-3.5 w-3.5 text-[#D4AF37]" />
+            <span className="hidden sm:inline">New Chat</span>
+          </Button>
+
+          {/* Temporary Chat Toggle */}
+          {isTemporary ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleExitTemporaryChat}
+              className="h-7 px-2 text-xs rounded-lg border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 transition-all flex items-center gap-1 shrink-0"
+              title="Exit temporary chat and return to saved chats"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Exit Temp</span>
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigate({ to: "/chat/$threadId", params: { threadId: "temp" } })}
+              className="h-7 px-2 text-xs rounded-lg border-[#2A2E44] bg-[#0E101A] hover:bg-[#1A1810] hover:border-amber-400/40 text-[#8A8F9E] hover:text-amber-300 transition-all flex items-center gap-1 shrink-0"
+              title="Start a private, unsaved temporary chat session"
+            >
+              <Ghost className="h-3.5 w-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Temporary</span>
+            </Button>
+          )}
+        </div>
+
+        {/* Right Controls */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Voice Audio Mute Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              setVoiceOn((v) => !v);
+              toast.info(!voiceOn ? "Voice audio responses enabled" : "Voice audio responses muted");
+            }}
+            className={`p-1.5 rounded-lg border transition-all ${
+              voiceOn
+                ? "bg-[#1A1810] border-[#D4AF37]/40 text-[#D4AF37]"
+                : "bg-[#0E101A] border-[#1F2336] text-[#8A8F9E] hover:text-white"
+            }`}
+            title={voiceOn ? "Mute Coach Ziri's voice audio" : "Enable Coach Ziri's voice audio"}
+          >
+            {voiceOn ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+          </button>
+
+          {/* Ultra-Low Latency Voice Call CTA */}
+          <Button
+            size="sm"
+            onClick={callActive ? stopCall : startCall}
+            className={`h-7 px-2.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all shadow-sm ${
+              callActive
+                ? "bg-red-600 hover:bg-red-700 text-white animate-pulse"
+                : "bg-gradient-to-r from-[#D4AF37] to-[#B8860B] hover:brightness-110 text-black font-bold"
+            }`}
+          >
+            {callActive ? <PhoneOff className="h-3.5 w-3.5" /> : <Phone className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">{callActive ? "End Call" : "Voice Call"}</span>
+          </Button>
+
+          {/* Delete Thread Button (only for saved threads) */}
+          {!isTemporary && currentThread && (
+            <button
+              type="button"
+              onClick={handleDeleteCurrentThread}
+              className="p-1.5 rounded-lg border border-transparent hover:border-red-500/30 hover:bg-red-500/10 text-[#8A8F9E] hover:text-red-400 transition-all"
+              title="Delete this conversation"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Temporary Chat Notice Banner */}
+      {isTemporary && (
+        <div className="mx-3 sm:mx-4 mt-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs text-amber-200/90 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <Ghost className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+            <span className="truncate text-[11px] sm:text-xs">
+              <strong>Temporary Chat:</strong> Messages in this session will not be saved to your history.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleStartNewChat}
+            className="text-[11px] font-semibold text-amber-400 hover:text-amber-200 underline shrink-0 ml-2"
+          >
+            Switch to Saved
+          </button>
+        </div>
+      )}
 
       {/* Full-Screen / Immersive Voice Call Modal */}
       <VoiceCallModal
