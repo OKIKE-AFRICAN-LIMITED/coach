@@ -1304,14 +1304,14 @@ function Chat({
       />
 
       {/* Top Chat Header: Thread Switcher, New Chat, Temporary Chat Toggle */}
-      <div className="h-12 border-b border-[#1F2336] px-3 sm:px-4 flex items-center justify-between shrink-0 bg-[#090A10]/95 backdrop-blur-md z-10">
+      <div className="h-12 border-b border-border px-3 sm:px-4 flex items-center justify-between shrink-0 bg-background/90 dark:bg-[#090A10]/95 backdrop-blur-md z-10 transition-colors">
         {/* Left Controls */}
         <div className="flex items-center gap-2 min-w-0">
           {isTemporary ? (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-semibold">
-              <Ghost className="h-3.5 w-3.5 text-amber-400 animate-pulse" />
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold">
+              <Ghost className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
               <span>Temporary Chat</span>
-              <span className="hidden sm:inline text-[10px] text-amber-400/80 font-normal">
+              <span className="hidden sm:inline text-[10px] text-amber-600/80 dark:text-amber-400/80 font-normal">
                 (Unsaved)
               </span>
             </div>
@@ -1320,32 +1320,32 @@ function Chat({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-[#141624] text-xs font-semibold text-white max-w-[170px] sm:max-w-xs truncate border border-transparent hover:border-[#2A2E44] transition-all text-left"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-card/60 hover:bg-muted text-xs font-semibold text-foreground max-w-[170px] sm:max-w-xs truncate border border-border/80 hover:border-[#D4AF37]/50 transition-all text-left shadow-2xs"
                 >
                   <MessageSquare className="h-3.5 w-3.5 text-[#D4AF37] shrink-0" />
                   <span className="truncate">{currentThread?.title || "Current Chat"}</span>
-                  <ChevronDown className="h-3 w-3 text-[#8A8F9E] shrink-0" />
+                  <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="start"
-                className="w-72 max-h-80 overflow-y-auto bg-[#0E101A] border border-[#1F2336] text-white p-1"
+                className="w-72 max-h-80 overflow-y-auto bg-popover border border-border text-popover-foreground shadow-lg p-1"
               >
-                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-[#6C7180] px-2 py-1 flex items-center justify-between">
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1 flex items-center justify-between">
                   <span>Your Conversations</span>
-                  <span className="font-mono text-[9px] text-[#A0A5B5]">
+                  <span className="font-mono text-[9px] text-muted-foreground">
                     {threadsQ.data?.length ?? 0} saved
                   </span>
                 </DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-[#1F2336]" />
+                <DropdownMenuSeparator className="bg-border" />
                 {(threadsQ.data ?? []).map((t) => (
                   <DropdownMenuItem
                     key={t.id}
                     onClick={() => navigate({ to: "/chat/$threadId", params: { threadId: t.id } })}
                     className={`flex items-center justify-between text-xs px-2.5 py-2 cursor-pointer rounded-lg transition-colors ${
                       t.id === threadId
-                        ? "bg-[#1A1810] text-[#F5E0A3] font-semibold border border-[#D4AF37]/30"
-                        : "text-[#D1D5DB] hover:bg-[#141624] hover:text-white"
+                        ? "bg-[#D4AF37]/15 text-[#D4AF37] dark:text-[#F5E0A3] font-semibold border border-[#D4AF37]/30"
+                        : "text-foreground hover:bg-muted"
                     }`}
                   >
                     <span className="truncate pr-2">{t.title}</span>
@@ -1363,7 +1363,7 @@ function Chat({
             size="sm"
             variant="outline"
             onClick={handleStartNewChat}
-            className="h-7 px-2.5 text-xs rounded-lg border-[#2A2E44] bg-[#0E101A] hover:bg-[#1A1810] hover:border-[#D4AF37]/40 text-[#E5C185] hover:text-white transition-all flex items-center gap-1 shrink-0"
+            className="h-7 px-2.5 text-xs rounded-lg border-border hover:border-[#D4AF37]/60 bg-background hover:bg-muted text-foreground transition-all flex items-center gap-1 shrink-0 shadow-2xs"
             title="Start a new chat thread"
           >
             <Plus className="h-3.5 w-3.5 text-[#D4AF37]" />
@@ -1376,10 +1376,10 @@ function Chat({
               size="sm"
               variant="outline"
               onClick={handleExitTemporaryChat}
-              className="h-7 px-2 text-xs rounded-lg border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 transition-all flex items-center gap-1 shrink-0"
+              className="h-7 px-2 text-xs rounded-lg border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-200 transition-all flex items-center gap-1 shrink-0"
               title="Exit temporary chat and return to saved chats"
             >
-              <ArrowLeft className="h-3.5 w-3.5 text-amber-400" />
+              <ArrowLeft className="h-3.5 w-3.5 text-amber-500" />
               <span className="hidden sm:inline">Exit Temp</span>
             </Button>
           ) : (
@@ -1387,10 +1387,10 @@ function Chat({
               size="sm"
               variant="outline"
               onClick={() => navigate({ to: "/chat/$threadId", params: { threadId: "temp" } })}
-              className="h-7 px-2 text-xs rounded-lg border-[#2A2E44] bg-[#0E101A] hover:bg-[#1A1810] hover:border-amber-400/40 text-[#8A8F9E] hover:text-amber-300 transition-all flex items-center gap-1 shrink-0"
+              className="h-7 px-2 text-xs rounded-lg border-border hover:border-amber-500/60 bg-background hover:bg-muted text-muted-foreground hover:text-foreground transition-all flex items-center gap-1 shrink-0 shadow-2xs"
               title="Start a private, unsaved temporary chat session"
             >
-              <Ghost className="h-3.5 w-3.5 text-amber-400" />
+              <Ghost className="h-3.5 w-3.5 text-amber-500" />
               <span className="hidden sm:inline">Temporary</span>
             </Button>
           )}
@@ -1407,8 +1407,8 @@ function Chat({
             }}
             className={`p-1.5 rounded-lg border transition-all ${
               voiceOn
-                ? "bg-[#1A1810] border-[#D4AF37]/40 text-[#D4AF37]"
-                : "bg-[#0E101A] border-[#1F2336] text-[#8A8F9E] hover:text-white"
+                ? "bg-[#D4AF37]/15 border-[#D4AF37]/40 text-[#D4AF37]"
+                : "bg-background border-border text-muted-foreground hover:text-foreground hover:bg-muted"
             }`}
             title={voiceOn ? "Mute Coach Ziri's voice audio" : "Enable Coach Ziri's voice audio"}
           >
@@ -1422,7 +1422,7 @@ function Chat({
             className={`h-7 px-2.5 text-xs rounded-lg font-semibold flex items-center gap-1.5 transition-all shadow-sm ${
               callActive
                 ? "bg-red-600 hover:bg-red-700 text-white animate-pulse"
-                : "bg-gradient-to-r from-[#D4AF37] to-[#B8860B] hover:brightness-110 text-black font-bold"
+                : "bg-gradient-to-r from-[#D4AF37] to-[#B8860B] hover:brightness-105 text-neutral-950 font-bold"
             }`}
           >
             {callActive ? <PhoneOff className="h-3.5 w-3.5" /> : <Phone className="h-3.5 w-3.5" />}
@@ -1434,7 +1434,7 @@ function Chat({
             <button
               type="button"
               onClick={handleDeleteCurrentThread}
-              className="p-1.5 rounded-lg border border-transparent hover:border-red-500/30 hover:bg-red-500/10 text-[#8A8F9E] hover:text-red-400 transition-all"
+              className="p-1.5 rounded-lg border border-transparent hover:border-red-500/30 hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all"
               title="Delete this conversation"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -1445,9 +1445,9 @@ function Chat({
 
       {/* Temporary Chat Notice Banner */}
       {isTemporary && (
-        <div className="mx-3 sm:mx-4 mt-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs text-amber-200/90 shrink-0">
+        <div className="mx-3 sm:mx-4 mt-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs text-amber-800 dark:text-amber-200/90 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <Ghost className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+            <Ghost className="h-3.5 w-3.5 text-amber-500 shrink-0" />
             <span className="truncate text-[11px] sm:text-xs">
               <strong>Temporary Chat:</strong> Messages in this session will not be saved to your history.
             </span>
@@ -1455,7 +1455,7 @@ function Chat({
           <button
             type="button"
             onClick={handleStartNewChat}
-            className="text-[11px] font-semibold text-amber-400 hover:text-amber-200 underline shrink-0 ml-2"
+            className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200 underline shrink-0 ml-2"
           >
             Switch to Saved
           </button>
