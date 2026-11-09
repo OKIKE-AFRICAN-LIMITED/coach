@@ -13,7 +13,13 @@ export default defineConfig({
       server: { entry: "server" },
       serverFns: { disableCsrfMiddlewareWarning: true },
     }),
-    nitro(),
+    nitro({
+      vercel: {
+        functions: {
+          maxDuration: 60,
+        },
+      },
+    }),
     react(),
   ],
   server: {
