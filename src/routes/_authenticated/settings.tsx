@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getGoogleIntegrationStatus, disconnectGoogleIntegration } from "@/lib/google.functions";
 import { listMemories, createMemory, deleteMemory, type MemoryCategory } from "@/lib/memories.functions";
+import { ensurePushSubscribed } from "@/hooks/use-task-reminders";
 import { Mail, Calendar, CheckCircle2, XCircle, ShieldCheck, Loader2, Settings, User, Bell, Cpu, Copy, Brain, Trash2, Plus } from "lucide-react";
 import { format } from "date-fns";
 
@@ -148,6 +149,7 @@ function SettingsPage() {
     const p = await Notification.requestPermission();
     setPushPerm(p);
     if (p === "granted") {
+      await ensurePushSubscribed().catch(() => {});
       new Notification("Coach Ziri is ready", { body: "I'll nudge you about tasks here." });
     }
   }
