@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import webpush from "web-push";
 
 // Configure VAPID details for Web Push
@@ -67,4 +68,31 @@ export async function sendWebPush(
     const isExpired = err?.statusCode === 404 || err?.statusCode === 410;
     return { success: false, statusCode: err?.statusCode, shouldRemove: isExpired };
   }
+}
+
+function getReminderSigningSecret(): string {
+  return (
+    process.env.PUSH_CRON_SECRET ||
+    process.env.VAPID_PRIVATE_KEY ||
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    ""
+  );
+}
+
+/** Signs a taskId so background service-worker reminder actions cannot be forged. */
+export function signReminderActionToken(taskId: string): string {
+  const secret = getReminderSigningSecret();
+  if (!secret) return "";
+  return crypto.createHmac("sha256", secret).update(taskId).digest("hex");
+}
+
+/** Verifies a reminder action HMAC token in constant time. */
+export function verifyReminderActionToken(taskId: string, token: string): boolean {
+  const secret = getReminderSigningSecret();
+  if (!secret || !token) return false;
+  const expected = crypto.createHmac("sha256", secret).update(taskId).digest("hex");
+  const a = Buffer.from(expected, "utf8");
+  const b = Buffer.from(token, "utf8");
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }

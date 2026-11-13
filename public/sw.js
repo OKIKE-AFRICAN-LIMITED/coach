@@ -59,6 +59,7 @@ self.addEventListener("notificationclick", (event) => {
 
   const action = event.action;
   const taskId = event.notification.data?.taskId;
+  const actionToken = event.notification.data?.actionToken;
   const targetUrl = event.notification.data?.url || "/tasks";
 
   if (action === "snooze_5" || action === "snooze") {
@@ -76,7 +77,7 @@ self.addEventListener("notificationclick", (event) => {
             await fetch("/api/reminders/action", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ action: "snooze", taskId, minutes: 5 }),
+              body: JSON.stringify({ action: "snooze", taskId, minutes: 5, actionToken }),
             });
           } catch (e) {
             console.error("SW snooze fetch failed:", e);
@@ -102,7 +103,7 @@ self.addEventListener("notificationclick", (event) => {
             await fetch("/api/reminders/action", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ action: "dismiss", taskId }),
+              body: JSON.stringify({ action: "dismiss", taskId, actionToken }),
             });
           } catch (e) {
             console.error("SW dismiss fetch failed:", e);

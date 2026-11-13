@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { sendWebPush } from "@/lib/push-notifications";
+import { sendWebPush, signReminderActionToken } from "@/lib/push-notifications";
 
 export const Route = createFileRoute("/api/public/send-reminders")({
   server: {
@@ -74,6 +74,7 @@ async function handleCheckReminders(request: Request) {
           taskId: task.id,
           remindAt: task.remind_at,
           url: "/tasks",
+          actionToken: signReminderActionToken(task.id),
         },
       };
 

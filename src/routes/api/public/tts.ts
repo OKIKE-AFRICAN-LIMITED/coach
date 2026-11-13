@@ -63,10 +63,7 @@ async function fetchGeminiAudio(
   text: string,
   apiKey: string,
 ): Promise<{ buffer: ArrayBuffer | null; lastError: string }> {
-  const models = [
-    "gemini-2.5-flash-preview-tts",
-    "gemini-2.0-flash-exp",
-  ];
+  const models = ["gemini-2.5-flash-preview-tts"];
 
   let lastError = "";
   for (const model of models) {
