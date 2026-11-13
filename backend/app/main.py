@@ -76,6 +76,8 @@ async def health_check() -> dict[str, Any]:
         "service": settings.PROJECT_NAME,
         "version": settings.VERSION,
         "supabase_configured": bool(settings.SUPABASE_URL and settings.SUPABASE_PUBLISHABLE_KEY),
+        "groq_configured": bool(settings.GROQ_API_KEY),
+        "groq_model": settings.GROQ_MODEL,
         "gemini_configured": bool(settings.GOOGLE_GENERATIVE_AI_API_KEY),
         "google_oauth_configured": bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET),
         "timestamp": datetime.now(timezone.utc).isoformat(),
