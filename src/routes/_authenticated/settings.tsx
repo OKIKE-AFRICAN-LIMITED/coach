@@ -33,6 +33,7 @@ function SettingsPage() {
   const [userId, setUserId] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [pushTime, setPushTime] = useState("08:00");
+  const [eveningPushTime, setEveningPushTime] = useState("20:00");
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [pushPerm, setPushPerm] = useState<NotificationPermission>("default");
   const [saving, setSaving] = useState(false);
@@ -95,6 +96,7 @@ function SettingsPage() {
       if (prof) {
         setDisplayName(prof.display_name ?? "");
         setPushTime(prof.push_time);
+        setEveningPushTime(prof.evening_push_time ?? "20:00");
         setEmailEnabled(prof.email_enabled);
       }
     });
@@ -122,9 +124,17 @@ function SettingsPage() {
     setSaving(true);
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
+    const timezoneOffsetMinutes = -new Date().getTimezoneOffset();
     const { error } = await supabase
       .from("profiles")
-      .upsert({ id: u.user.id, display_name: displayName, push_time: pushTime, email_enabled: emailEnabled });
+      .upsert({
+        id: u.user.id,
+        display_name: displayName,
+        push_time: pushTime,
+        evening_push_time: eveningPushTime,
+        timezone_offset_minutes: timezoneOffsetMinutes,
+        email_enabled: emailEnabled,
+      });
     setSaving(false);
     if (error) toast.error(error.message);
     else toast.success("Settings saved");
@@ -288,18 +298,29 @@ function SettingsPage() {
           </div>
 
           <div className="space-y-4">
-            <div className="space-y-1.5 max-w-md">
-              <Label className="text-xs text-[#A0A5B5]">Daily Nudge Time</Label>
-              <Input
-                type="time"
-                value={pushTime}
-                onChange={(e) => setPushTime(e.target.value)}
-                className="bg-[#141624] border-[#1F2336] text-xs text-white"
-              />
-              <p className="text-[11px] text-[#8A8F9E]">
-                Coach Ziri will deliver your priority briefing at this time.
-              </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-[#A0A5B5]">Morning Briefing Time</Label>
+                <Input
+                  type="time"
+                  value={pushTime}
+                  onChange={(e) => setPushTime(e.target.value)}
+                  className="bg-[#141624] border-[#1F2336] text-xs text-white"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-[#A0A5B5]">Evening Check-In Time</Label>
+                <Input
+                  type="time"
+                  value={eveningPushTime}
+                  onChange={(e) => setEveningPushTime(e.target.value)}
+                  className="bg-[#141624] border-[#1F2336] text-xs text-white"
+                />
+              </div>
             </div>
+            <p className="text-[11px] text-[#8A8F9E]">
+              Coach Ziri will deliver your morning plan and evening check-in push notifications at these local times.
+            </p>
 
             <div className="flex items-center justify-between gap-3 pt-2 border-t border-[#1F2336]">
               <div>

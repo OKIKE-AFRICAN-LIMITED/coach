@@ -622,8 +622,29 @@ function ChatThreadPage() {
   useEffect(() => {
     if (threadId === "new" && !creatingRef.current) {
       creatingRef.current = true;
-      createT({ data: { title: "New chat" } })
+      const briefingParam =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("briefing")
+          : null;
+      const initialTitle =
+        briefingParam === "morning"
+          ? "Morning Briefing"
+          : briefingParam === "evening"
+            ? "Evening Check-In"
+            : "New chat";
+      createT({ data: { title: initialTitle } })
         .then((t) => {
+          if (briefingParam === "morning") {
+            sessionStorage.setItem(
+              `ziri_initial_prompt_${t.id}`,
+              "Give me my morning briefing: review what is due today, overdue tasks, habits, and upcoming calendar events, and help me prioritize my day.",
+            );
+          } else if (briefingParam === "evening") {
+            sessionStorage.setItem(
+              `ziri_initial_prompt_${t.id}`,
+              "Let's do my evening check-in: review what I completed today, what is still open, and help me set priorities for tomorrow.",
+            );
+          }
           navigate({ to: "/chat/$threadId", params: { threadId: t.id }, replace: true });
         })
         .catch(() => {

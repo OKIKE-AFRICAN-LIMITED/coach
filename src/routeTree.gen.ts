@@ -32,6 +32,7 @@ import { Route as ApiRemindersActionRouteImport } from './routes/api/reminders/a
 import { Route as ApiPublicTtsRouteImport } from './routes/api/public/tts'
 import { Route as ApiPublicSttRouteImport } from './routes/api/public/stt'
 import { Route as ApiPublicSendRemindersRouteImport } from './routes/api/public/send-reminders'
+import { Route as ApiPublicSendBriefingsRouteImport } from './routes/api/public/send-briefings'
 import { Route as ApiPublicKeepAliveRouteImport } from './routes/api/public/keep-alive'
 import { Route as AuthenticatedChatThreadIdRouteImport } from './routes/_authenticated/chat.$threadId'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
@@ -151,6 +152,11 @@ const ApiPublicSendRemindersRoute = ApiPublicSendRemindersRouteImport.update({
   path: '/api/public/send-reminders',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicSendBriefingsRoute = ApiPublicSendBriefingsRouteImport.update({
+  id: '/api/public/send-briefings',
+  path: '/api/public/send-briefings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicKeepAliveRoute = ApiPublicKeepAliveRouteImport.update({
   id: '/api/public/keep-alive',
   path: '/api/public/keep-alive',
@@ -189,6 +195,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/chat/$threadId': typeof AuthenticatedChatThreadIdRoute
   '/api/public/keep-alive': typeof ApiPublicKeepAliveRoute
+  '/api/public/send-briefings': typeof ApiPublicSendBriefingsRoute
   '/api/public/send-reminders': typeof ApiPublicSendRemindersRoute
   '/api/public/stt': typeof ApiPublicSttRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
@@ -215,6 +222,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/chat/$threadId': typeof AuthenticatedChatThreadIdRoute
   '/api/public/keep-alive': typeof ApiPublicKeepAliveRoute
+  '/api/public/send-briefings': typeof ApiPublicSendBriefingsRoute
   '/api/public/send-reminders': typeof ApiPublicSendRemindersRoute
   '/api/public/stt': typeof ApiPublicSttRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
@@ -244,6 +252,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/chat/$threadId': typeof AuthenticatedChatThreadIdRoute
   '/api/public/keep-alive': typeof ApiPublicKeepAliveRoute
+  '/api/public/send-briefings': typeof ApiPublicSendBriefingsRoute
   '/api/public/send-reminders': typeof ApiPublicSendRemindersRoute
   '/api/public/stt': typeof ApiPublicSttRoute
   '/api/public/tts': typeof ApiPublicTtsRoute
@@ -273,6 +282,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/chat/$threadId'
     | '/api/public/keep-alive'
+    | '/api/public/send-briefings'
     | '/api/public/send-reminders'
     | '/api/public/stt'
     | '/api/public/tts'
@@ -299,6 +309,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/chat/$threadId'
     | '/api/public/keep-alive'
+    | '/api/public/send-briefings'
     | '/api/public/send-reminders'
     | '/api/public/stt'
     | '/api/public/tts'
@@ -327,6 +338,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/users'
     | '/_authenticated/chat/$threadId'
     | '/api/public/keep-alive'
+    | '/api/public/send-briefings'
     | '/api/public/send-reminders'
     | '/api/public/stt'
     | '/api/public/tts'
@@ -343,6 +355,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiGoogleCallbackRoute: typeof ApiGoogleCallbackRoute
   ApiPublicKeepAliveRoute: typeof ApiPublicKeepAliveRoute
+  ApiPublicSendBriefingsRoute: typeof ApiPublicSendBriefingsRoute
   ApiPublicSendRemindersRoute: typeof ApiPublicSendRemindersRoute
   ApiPublicSttRoute: typeof ApiPublicSttRoute
   ApiPublicTtsRoute: typeof ApiPublicTtsRoute
@@ -512,6 +525,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSendRemindersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/send-briefings': {
+      id: '/api/public/send-briefings'
+      path: '/api/public/send-briefings'
+      fullPath: '/api/public/send-briefings'
+      preLoaderRoute: typeof ApiPublicSendBriefingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/keep-alive': {
       id: '/api/public/keep-alive'
       path: '/api/public/keep-alive'
@@ -603,6 +623,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiGoogleCallbackRoute: ApiGoogleCallbackRoute,
   ApiPublicKeepAliveRoute: ApiPublicKeepAliveRoute,
+  ApiPublicSendBriefingsRoute: ApiPublicSendBriefingsRoute,
   ApiPublicSendRemindersRoute: ApiPublicSendRemindersRoute,
   ApiPublicSttRoute: ApiPublicSttRoute,
   ApiPublicTtsRoute: ApiPublicTtsRoute,
@@ -611,13 +632,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

@@ -78,27 +78,39 @@ export type Database = {
           created_at: string
           display_name: string | null
           email_enabled: boolean
+          evening_push_time: string
           id: string
           is_admin: boolean
+          last_evening_briefing_date: string | null
+          last_morning_briefing_date: string | null
           push_time: string
+          timezone_offset_minutes: number
           updated_at: string
         }
         Insert: {
           created_at?: string
           display_name?: string | null
           email_enabled?: boolean
+          evening_push_time?: string
           id: string
           is_admin?: boolean
+          last_evening_briefing_date?: string | null
+          last_morning_briefing_date?: string | null
           push_time?: string
+          timezone_offset_minutes?: number
           updated_at?: string
         }
         Update: {
           created_at?: string
           display_name?: string | null
           email_enabled?: boolean
+          evening_push_time?: string
           id?: string
           is_admin?: boolean
+          last_evening_briefing_date?: string | null
+          last_morning_briefing_date?: string | null
           push_time?: string
+          timezone_offset_minutes?: number
           updated_at?: string
         }
         Relationships: []

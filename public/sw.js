@@ -43,11 +43,14 @@ self.addEventListener("push", (event) => {
       taskId: taskId,
       url: data.data?.url || "/tasks",
       remindAt: data.data?.remindAt,
+      actionToken: data.data?.actionToken,
     },
-    actions: [
-      { action: "snooze_5", title: "⏱ Snooze 5m" },
-      { action: "dismiss", title: "✓ Dismiss" },
-    ],
+    actions: taskId
+      ? [
+          { action: "snooze_5", title: "⏱ Snooze 5m" },
+          { action: "dismiss", title: "✓ Dismiss" },
+        ]
+      : [],
   };
 
   event.waitUntil(self.registration.showNotification(data.title, options));
