@@ -739,10 +739,17 @@ function Chat({
   const callActiveRef = useRef(false);
   const micMutedRef = useRef(false);
   const callStateRef = useRef<"idle" | "listening" | "thinking" | "speaking">("idle");
-  const callRecRef = useRef<ISpeechRecognition | null>(null);
+  const callStreamRef = useRef<MediaStream | null>(null);
+  const callAudioCtxRef = useRef<AudioContext | null>(null);
+  const callAnalyserRef = useRef<AnalyserNode | null>(null);
+  const callVadTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const callRecorderRef = useRef<MediaRecorder | null>(null);
+  const callChunksRef = useRef<Blob[]>([]);
+  const speechDetectedRef = useRef(false);
+  const speechStartRef = useRef<number | null>(null);
+  const silenceStartRef = useRef<number | null>(null);
+  const discardRecordingRef = useRef(false);
   const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingTranscriptRef = useRef("");
 
   const setCallStateSynced = useCallback(
     (s: "idle" | "listening" | "thinking" | "speaking") => {
@@ -757,124 +764,160 @@ function Chat({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const spokenRef = useRef<Set<string>>(new Set(initial.map((m) => m.id)));
 
-  /** Commits and sends the accumulated spoken transcript even if background music prevented isFinal */
-  const commitSpokenTranscript = useCallback(
-    async (rawText: string, startListeningFn: () => void) => {
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = null;
-      }
-      const text = rawText.trim();
-      if (!text || callStateRef.current === "thinking") return;
-
-      pendingTranscriptRef.current = "";
-      setLiveTranscript(text);
-      setCallStateSynced("thinking");
+  const stopCallRecorderOnly = useCallback((discard = true) => {
+    if (callVadTimerRef.current) {
+      clearInterval(callVadTimerRef.current);
+      callVadTimerRef.current = null;
+    }
+    discardRecordingRef.current = discard;
+    const rec = callRecorderRef.current;
+    if (rec && rec.state !== "inactive") {
       try {
-        callRecRef.current?.abort();
+        rec.stop();
       } catch {
         /* ignore */
       }
-      callRecRef.current = null;
+    }
+    callRecorderRef.current = null;
+  }, []);
 
-      try {
-        await sendMessage({ text });
-      } catch {
-        setLiveTranscript("");
-        setCallStateSynced("listening");
-        setTimeout(() => startListeningFn(), 350);
-      }
-    },
-    [sendMessage, setCallStateSynced],
-  );
-
-  /** Starts one SpeechRecognition session. On end, re-arms itself unless stopped or muted. */
+  /** Starts one VAD-guided MediaRecorder turn and transcribes via Groq Whisper (/api/public/stt). */
   const startListening = useCallback(() => {
     if (!callActiveRef.current || micMutedRef.current) return;
     if (callStateRef.current === "speaking" || callStateRef.current === "thinking") return;
+    const stream = callStreamRef.current;
+    const analyser = callAnalyserRef.current;
+    if (!stream || !analyser) return;
 
-    const SR = getSR();
-    if (!SR) return;
+    stopCallRecorderOnly(true);
 
+    const mimeCandidates = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/mp4",
+      "audio/ogg;codecs=opus",
+    ];
+    const mimeType =
+      typeof MediaRecorder !== "undefined"
+        ? mimeCandidates.find((m) => MediaRecorder.isTypeSupported(m))
+        : undefined;
+
+    let rec: MediaRecorder;
     try {
-      if (callRecRef.current) {
-        callRecRef.current.abort();
+      rec = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    } catch {
+      toast.error("Voice recording is not supported on this browser.");
+      return;
+    }
+
+    callChunksRef.current = [];
+    speechDetectedRef.current = false;
+    speechStartRef.current = null;
+    silenceStartRef.current = null;
+    discardRecordingRef.current = false;
+
+    rec.ondataavailable = (ev) => {
+      if (ev.data && ev.data.size > 0) {
+        callChunksRef.current.push(ev.data);
       }
-    } catch { /* ignore */ }
-    callRecRef.current = null;
+    };
 
-    const r = new SR();
-    r.continuous = true;
-    r.interimResults = true;
-    r.lang = "en-US";
+    rec.onstop = async () => {
+      if (callVadTimerRef.current) {
+        clearInterval(callVadTimerRef.current);
+        callVadTimerRef.current = null;
+      }
+      callRecorderRef.current = null;
 
-    r.onresult = async (e: SpeechRecognitionEvent) => {
-      if (micMutedRef.current || callStateRef.current === "thinking") return;
+      if (discardRecordingRef.current || !callActiveRef.current || micMutedRef.current) {
+        return;
+      }
 
-      let combined = "";
-      let hasFinal = false;
-      for (let i = 0; i < e.results.length; i++) {
-        combined += e.results[i][0].transcript + " ";
-        if (e.results[i].isFinal) {
-          hasFinal = true;
+      const blob = new Blob(callChunksRef.current, { type: rec.mimeType || "audio/webm" });
+      if (blob.size < 1200 || !speechDetectedRef.current) {
+        setLiveTranscript("");
+        setCallStateSynced("listening");
+        setTimeout(() => startListening(), 150);
+        return;
+      }
+
+      setCallStateSynced("thinking");
+      setLiveTranscript("Transcribing…");
+
+      try {
+        const fd = new FormData();
+        fd.append("audio", blob, "speech.webm");
+        const sttRes = await fetch("/api/public/stt", { method: "POST", body: fd });
+        if (!sttRes.ok) {
+          throw new Error(`STT failed (${sttRes.status})`);
+        }
+        const { text } = (await sttRes.json()) as { text?: string };
+        const cleanText = (text ?? "").trim();
+        if (!cleanText) {
+          setLiveTranscript("");
+          setCallStateSynced("listening");
+          setTimeout(() => startListening(), 200);
+          return;
+        }
+        setLiveTranscript(cleanText);
+        await sendMessage({ text: cleanText });
+      } catch (err) {
+        console.error("[Voice Call STT/Send Error]:", err);
+        setLiveTranscript("");
+        if (callActiveRef.current) {
+          setCallStateSynced("listening");
+          setTimeout(() => startListening(), 350);
         }
       }
-      const cleanCombined = combined.trim();
-      if (!cleanCombined) return;
-
-      pendingTranscriptRef.current = cleanCombined;
-      setLiveTranscript(cleanCombined);
-
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = null;
-      }
-
-      if (hasFinal) {
-        // Browser detected a natural sentence end — wait 650ms in case user keeps talking, then send
-        silenceTimerRef.current = setTimeout(() => {
-          void commitSpokenTranscript(pendingTranscriptRef.current, startListening);
-        }, 650);
-      } else {
-        // Even with background music preventing isFinal, auto-send after 1.7s of no new words!
-        silenceTimerRef.current = setTimeout(() => {
-          void commitSpokenTranscript(pendingTranscriptRef.current, startListening);
-        }, 1700);
-      }
     };
 
-    r.onend = () => {
-      callRecRef.current = null;
-      if (!callActiveRef.current || micMutedRef.current) return;
-      const state = callStateRef.current;
-      if (state === "thinking" || state === "speaking") return;
-      // If browser ended the session while we had buffered words (e.g. background noise timeout), send them!
-      if (pendingTranscriptRef.current.trim().length > 0) {
-        void commitSpokenTranscript(pendingTranscriptRef.current, startListening);
+    callRecorderRef.current = rec;
+    rec.start(250);
+    setCallStateSynced("listening");
+
+    const dataBuf = new Uint8Array(analyser.fftSize);
+    callVadTimerRef.current = setInterval(() => {
+      if (!callActiveRef.current || micMutedRef.current || callStateRef.current !== "listening") {
         return;
       }
-      setTimeout(() => startListening(), 250);
-    };
-
-    r.onerror = (e: SpeechRecognitionErrorEvent) => {
-      callRecRef.current = null;
-      if (!callActiveRef.current || micMutedRef.current || e.error === "aborted" || e.error === "no-speech") return;
-      if (e.error === "network") {
-        setTimeout(() => startListening(), 800);
-        return;
+      analyser.getByteTimeDomainData(dataBuf);
+      let sum = 0;
+      for (let i = 0; i < dataBuf.length; i++) {
+        const v = (dataBuf[i] - 128) / 128;
+        sum += v * v;
       }
-      toast.error(`Mic error: ${e.error}`);
-    };
+      const rms = Math.sqrt(sum / dataBuf.length);
+      const now = Date.now();
 
-    callRecRef.current = r;
-    try {
-      r.start();
-      setCallStateSynced("listening");
-    } catch {
-      callRecRef.current = null;
-      setTimeout(() => startListening(), 400);
-    }
-  }, [commitSpokenTranscript, setCallStateSynced]);
+      if (rms > 0.022) {
+        if (!speechDetectedRef.current) {
+          speechDetectedRef.current = true;
+          speechStartRef.current = now;
+          setLiveTranscript("Listening to you…");
+        }
+        silenceStartRef.current = null;
+      } else if (speechDetectedRef.current) {
+        if (!silenceStartRef.current) {
+          silenceStartRef.current = now;
+        } else if (
+          now - silenceStartRef.current >= 1050 &&
+          speechStartRef.current &&
+          now - speechStartRef.current >= 300
+        ) {
+          if (callRecorderRef.current?.state === "recording") {
+            callRecorderRef.current.stop();
+          }
+          return;
+        }
+      }
+
+      if (speechStartRef.current && now - speechStartRef.current >= 25_000) {
+        if (callRecorderRef.current?.state === "recording") {
+          callRecorderRef.current.stop();
+        }
+      }
+    }, 80);
+  }, [sendMessage, setCallStateSynced, stopCallRecorderOnly]);
 
   /** Browser native speechSynthesis fallback (picks the highest-quality Natural/Google voice for 0ms latency) */
   const speakWithBrowserFallback = useCallback(
@@ -930,9 +973,8 @@ function Chat({
         setCallStateSynced("speaking");
       }
 
-      // Abort mic before playing TTS so speaker audio isn't recorded as user input
-      try { callRecRef.current?.abort(); } catch { /* ignore */ }
-      callRecRef.current = null;
+      // Stop recording before playing TTS so speaker audio isn't recorded as user input
+      stopCallRecorderOnly(true);
 
       // Split into first sentence + remainder so the first sentence synthesizes 3x faster!
       const match = clean.match(/^(.+?[.!?]+)\s+([\s\S]+)$/);
@@ -1136,17 +1178,24 @@ function Chat({
   const stopCall = useCallback(() => {
     callActiveRef.current = false;
     micMutedRef.current = false;
-    pendingTranscriptRef.current = "";
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
-    }
     if (watchdogRef.current) {
       clearInterval(watchdogRef.current);
       watchdogRef.current = null;
     }
-    try { callRecRef.current?.abort(); } catch { /* ignore */ }
-    callRecRef.current = null;
+    stopCallRecorderOnly(true);
+    try {
+      callStreamRef.current?.getTracks().forEach((t) => t.stop());
+    } catch {
+      /* ignore */
+    }
+    callStreamRef.current = null;
+    try {
+      void callAudioCtxRef.current?.close();
+    } catch {
+      /* ignore */
+    }
+    callAudioCtxRef.current = null;
+    callAnalyserRef.current = null;
     audioRef.current?.pause();
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
@@ -1157,13 +1206,32 @@ function Chat({
     setLiveTranscript("");
     setSpokenText("");
     setCallStateSynced("idle");
-  }, [setCallStateSynced]);
+  }, [setCallStateSynced, stopCallRecorderOnly]);
 
   const startCall = useCallback(async () => {
-    if (!getSR()) {
-      toast.error("Call mode requires Chrome or Edge browser");
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      toast.error("Microphone access is not available in this browser.");
       return;
     }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioCtx();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      source.connect(analyser);
+      callStreamRef.current = stream;
+      callAudioCtxRef.current = ctx;
+      callAnalyserRef.current = analyser;
+    } catch {
+      toast.error("Microphone permission denied. Please allow mic access and try again.");
+      return;
+    }
+
     if (!audioRef.current) audioRef.current = new Audio();
     await primeAudioElement(audioRef.current);
     callActiveRef.current = true;
@@ -1180,7 +1248,7 @@ function Chat({
         callActiveRef.current &&
         !micMutedRef.current &&
         callStateRef.current === "listening" &&
-        callRecRef.current === null
+        callRecorderRef.current === null
       ) {
         startListening();
       }
@@ -1192,13 +1260,12 @@ function Chat({
     micMutedRef.current = next;
     setMicMuted(next);
     if (next) {
-      try { callRecRef.current?.abort(); } catch { /* ignore */ }
-      callRecRef.current = null;
+      stopCallRecorderOnly(true);
       setLiveTranscript("");
     } else if (callActiveRef.current && callStateRef.current === "listening") {
       startListening();
     }
-  }, [startListening]);
+  }, [startListening, stopCallRecorderOnly]);
 
   const interruptSpeech = useCallback(() => {
     audioRef.current?.pause();
@@ -1229,11 +1296,11 @@ function Chat({
   }, [messages]);
 
   const forceSendTranscript = useCallback(() => {
-    const text = pendingTranscriptRef.current || liveTranscript;
-    if (text.trim()) {
-      void commitSpokenTranscript(text, startListening);
+    if (callRecorderRef.current?.state === "recording" && speechDetectedRef.current) {
+      discardRecordingRef.current = false;
+      callRecorderRef.current.stop();
     }
-  }, [liveTranscript, commitSpokenTranscript, startListening]);
+  }, []);
 
   // Live microphone volume metering only for standalone mic dictation (avoid fighting SpeechRecognition during call)
   const isMicMeteringActive = recording;
