@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getGoogleIntegrationStatus, disconnectGoogleIntegration } from "@/lib/google.functions";
-import { Mail, Calendar, CheckCircle2, XCircle, ShieldCheck, Loader2, Settings, User, Bell, Cpu, Copy } from "lucide-react";
+import { listMemories, createMemory, deleteMemory, type MemoryCategory } from "@/lib/memories.functions";
+import { Mail, Calendar, CheckCircle2, XCircle, ShieldCheck, Loader2, Settings, User, Bell, Cpu, Copy, Brain, Trash2, Plus } from "lucide-react";
 import { format } from "date-fns";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
@@ -22,6 +23,12 @@ function SettingsPage() {
   const qc = useQueryClient();
   const getStatusFn = useServerFn(getGoogleIntegrationStatus);
   const disconnectFn = useServerFn(disconnectGoogleIntegration);
+  const listMemoriesFn = useServerFn(listMemories);
+  const createMemoryFn = useServerFn(createMemory);
+  const deleteMemoryFn = useServerFn(deleteMemory);
+
+  const [newMemoryText, setNewMemoryText] = useState("");
+  const [newMemoryCategory, setNewMemoryCategory] = useState<MemoryCategory>("general");
 
   const [userId, setUserId] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -34,6 +41,37 @@ function SettingsPage() {
   const { data: googleStatus, isLoading: statusLoading } = useQuery({
     queryKey: ["googleIntegrationStatus"],
     queryFn: () => getStatusFn(),
+  });
+
+  const { data: memories = [], isLoading: memoriesLoading } = useQuery({
+    queryKey: ["userMemories"],
+    queryFn: () => listMemoriesFn(),
+  });
+
+  const addMemoryMutation = useMutation({
+    mutationFn: async () =>
+      createMemoryFn({
+        data: { content: newMemoryText.trim(), category: newMemoryCategory },
+      }),
+    onSuccess: () => {
+      setNewMemoryText("");
+      qc.invalidateQueries({ queryKey: ["userMemories"] });
+      toast.success("Memory saved to Coach Ziri");
+    },
+    onError: (e) => {
+      toast.error(e instanceof Error ? e.message : "Failed to save memory");
+    },
+  });
+
+  const deleteMemoryMutation = useMutation({
+    mutationFn: async (id: string) => deleteMemoryFn({ data: { id } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["userMemories"] });
+      toast.success("Memory removed");
+    },
+    onError: (e) => {
+      toast.error(e instanceof Error ? e.message : "Failed to remove memory");
+    },
   });
 
   const disconnectMutation = useMutation({
@@ -346,6 +384,92 @@ function SettingsPage() {
               <span className="text-[#8A8F9E]">Push leads & alerts from external sites</span>
             </div>
           </div>
+        </div>
+
+        {/* Coach Ziri Long-Term Memory */}
+        <div className="bg-[#0F111A] border border-[#1F2336] rounded-xl p-5 sm:p-6 space-y-4 shadow-xl">
+          <div className="flex items-center justify-between border-b border-[#1F2336] pb-3">
+            <div className="flex items-center gap-2 text-sm font-bold text-white">
+              <Brain className="h-4 w-4 text-[#D4AF37]" />
+              <span>Coach Ziri Long-Term Memory</span>
+            </div>
+            <span className="px-2.5 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#E5C185] border border-[#D4AF37]/30 text-[10px] font-semibold">
+              {memories.length} saved
+            </span>
+          </div>
+
+          <p className="text-xs text-[#8A8F9E] leading-relaxed">
+            Facts, preferences, and key contacts saved here persist across all your chat threads. Coach Ziri can also save and forget memories automatically while chatting.
+          </p>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (newMemoryText.trim()) addMemoryMutation.mutate();
+            }}
+            className="flex flex-col sm:flex-row gap-2"
+          >
+            <select
+              value={newMemoryCategory}
+              onChange={(e) => setNewMemoryCategory(e.target.value as MemoryCategory)}
+              className="h-9 rounded-xl bg-[#141624] border border-[#1F2336] text-xs text-[#E5C185] px-2.5 shrink-0"
+            >
+              <option value="general">General</option>
+              <option value="preference">Preference</option>
+              <option value="contact">Contact</option>
+              <option value="goal">Goal</option>
+              <option value="context">Context</option>
+            </select>
+            <Input
+              value={newMemoryText}
+              onChange={(e) => setNewMemoryText(e.target.value)}
+              placeholder="e.g. My co-founder's email is okikeafricanlimited@gmail.com"
+              className="bg-[#141624] border-[#1F2336] text-xs text-white flex-1"
+            />
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!newMemoryText.trim() || addMemoryMutation.isPending}
+              className="rounded-xl bg-[#D4AF37]/20 hover:bg-[#D4AF37]/30 text-[#E5C185] border border-[#D4AF37]/40 text-xs shrink-0"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" /> Remember
+            </Button>
+          </form>
+
+          {memoriesLoading ? (
+            <div className="flex items-center gap-2 text-xs text-[#8A8F9E]">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading saved memories...
+            </div>
+          ) : memories.length === 0 ? (
+            <p className="text-xs text-[#6C7180] italic">
+              No saved memories yet. Tell Coach Ziri something to remember in chat, or add one above.
+            </p>
+          ) : (
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {memories.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-[#141624] border border-[#1F2336] text-xs"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="px-2 py-0.5 rounded-md bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/25 text-[10px] uppercase font-semibold shrink-0">
+                      {m.category}
+                    </span>
+                    <span className="text-[#D1D5DB] truncate">{m.content}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => deleteMemoryMutation.mutate(m.id)}
+                    disabled={deleteMemoryMutation.isPending}
+                    className="p-1 rounded-lg text-[#8A8F9E] hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                    title="Forget this memory"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Save Button */}

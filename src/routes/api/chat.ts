@@ -104,6 +104,20 @@ export const Route = createFileRoute("/api/chat")({
           .select("*")
           .eq("status", "todo");
 
+        // Load cross-thread long-term memories for this user (graceful if migration not yet applied)
+        const { data: userMemories, error: memErr } = await supabase
+          .from("user_memories")
+          .select("id, category, content")
+          .eq("user_id", userId)
+          .order("updated_at", { ascending: false })
+          .limit(25);
+        const memoriesBlock =
+          !memErr && userMemories && userMemories.length > 0
+            ? `\n\nLONG-TERM USER MEMORY (persisted across all chats):\n${userMemories
+                .map((m) => `- [${m.category}] ${m.content} (id:${m.id})`)
+                .join("\n")}`
+            : "";
+
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const endOfToday = new Date(startOfToday.getTime() + 86400000);
@@ -125,12 +139,12 @@ export const Route = createFileRoute("/api/chat")({
         }
 
 Today is ${now.toISOString()}.
-Open tasks: ${openTasks?.length ?? 0} total. Overdue: ${overdue.length}. Due today: ${dueToday.length}. Neglected: ${neglected.length}.
+Open tasks: ${openTasks?.length ?? 0} total. Overdue: ${overdue.length}. Due today: ${dueToday.length}. Neglected: ${neglected.length}.${memoriesBlock}
 
 OKIKE INSTITUTIONAL KNOWLEDGE:
 You are built and powered by OKIKE Enterprises (https://okikeenterprises.com), operating across 3 branches: 01 Startups (OKIKE Ventures & AI Labs, including Coach Ziri at https://coach-ziri.okikeenterprises.com), 02 Businesses (OKIKE Studio at https://studio.okikeenterprises.com), and 03 Students (OKIKE Academy & the Aug 1, 2026 Computing Synergy Summit Bootcamp — free for CS/IT students with 'CSC' reg numbers, ₦5,000 for others).
 
-You have tools for tasks, web search, calendar, and email. Use them whenever the user asks. Always confirm actions briefly after doing them. When reading aloud, spell out times naturally (e.g. "three thirty PM"). Never paste raw URLs or JSON.`;
+You have tools for tasks, habits, goals, long-term memory, web search, calendar, and email. When the user shares durable personal preferences, key contacts (names/emails), routines, or asks you to remember something for future chats, call remember_fact${isTemporary ? " (note: this session is Temporary/Incognito, so do not save new memories unless they switch to a saved chat)" : ""}. Always confirm actions briefly after doing them. When reading aloud, spell out times naturally (e.g. "three thirty PM"). Never paste raw URLs or JSON.`;
 
         const groqModelName = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
         console.log("[api/chat] Using Groq Model:", groqModelName);
@@ -380,6 +394,52 @@ You have tools for tasks, web search, calendar, and email. Use them whenever the
                 dueToday,
                 neglected,
               }),
+            }),
+            remember_fact: tool({
+              description: "Save a durable personal fact, preference, key contact, or routine so Coach Ziri remembers it across all future chats.",
+              inputSchema: z.object({
+                content: z.string().min(1).max(500).describe("Concise factual statement to remember, e.g. 'Co-founder email is founder@company.com' or 'Prefers deep work from 6 AM to 11 AM'"),
+                category: z.enum(["preference", "contact", "goal", "context", "general"]).default("general"),
+              }),
+              execute: async ({ content, category }) => {
+                if (isTemporary) {
+                  return { error: "Temporary/Incognito chat is active — memories are not saved in temporary mode." };
+                }
+                const { data, error } = await supabase
+                  .from("user_memories")
+                  .insert({ user_id: userId, category, content: content.trim() })
+                  .select("id, category, content, created_at")
+                  .single();
+                if (error) return { error: error.message };
+                return { memory: data };
+              },
+            }),
+            list_memories: tool({
+              description: "List all saved long-term facts Coach Ziri remembers about the user.",
+              inputSchema: z.object({}),
+              execute: async () => {
+                const { data, error } = await supabase
+                  .from("user_memories")
+                  .select("id, category, content, updated_at")
+                  .eq("user_id", userId)
+                  .order("updated_at", { ascending: false })
+                  .limit(50);
+                if (error) return { error: error.message };
+                return { memories: data ?? [] };
+              },
+            }),
+            forget_fact: tool({
+              description: "Delete a saved long-term memory by its id when the user asks Coach Ziri to forget something.",
+              inputSchema: z.object({ id: z.string().uuid() }),
+              execute: async ({ id }) => {
+                const { error } = await supabase
+                  .from("user_memories")
+                  .delete()
+                  .eq("id", id)
+                  .eq("user_id", userId);
+                if (error) return { error: error.message };
+                return { ok: true, id };
+              },
             }),
             web_search: tool({
               description: "Search the web for current information, news, facts. Returns top results with snippets.",
