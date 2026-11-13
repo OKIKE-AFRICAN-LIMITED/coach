@@ -91,15 +91,12 @@ function LandingPage() {
       {/* ─── 1. TOP NAVIGATION BAR ────────────────────────────────────────── */}
       <header className="relative z-50 w-full px-6 lg:px-16 pt-6 pb-4 flex items-center justify-between max-w-7xl mx-auto bg-transparent border-0">
         {/* Brand Logo */}
-        <Link to="/" className="flex items-center gap-3 group">
+        <Link to="/" className="flex items-center group">
           <img
             src="/logo.png"
-            alt="Coach Ziri Logo"
+            alt="Coach Ziri"
             className="h-10 w-auto object-contain drop-shadow-[0_0_18px_rgba(212,175,55,0.4)] group-hover:scale-105 transition-transform"
           />
-          <span className="text-sm sm:text-base font-bold tracking-tight text-[#18181B] dark:text-white">
-            Coach Ziri
-          </span>
         </Link>
 
         {/* Center Navigation Links */}

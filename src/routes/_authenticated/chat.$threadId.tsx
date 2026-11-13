@@ -391,19 +391,14 @@ function VoiceCallModal({
       {/* Top Bar */}
       <div className="w-full max-w-2xl flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-card border flex items-center justify-center shadow-xs">
-            <img src="/logo.png" alt="Coach Ziri" className="h-5 w-5 object-contain" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold">Coach Ziri</span>
-              <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium border ${statusPillClass}`}>
-                {statusLabel}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground font-mono">
+          <img src="/logo.png" alt="Coach Ziri" className="h-8 w-auto object-contain" />
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium border ${statusPillClass}`}>
+              {statusLabel}
+            </span>
+            <span className="text-xs text-muted-foreground font-mono">
               {mins}:{secs}
-            </p>
+            </span>
           </div>
         </div>
 
