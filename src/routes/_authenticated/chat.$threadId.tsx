@@ -40,7 +40,12 @@ import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type UIMessage } from "ai";
+import {
+  DefaultChatTransport,
+  lastAssistantMessageIsCompleteWithApprovalResponses,
+  type ToolUIPart,
+  type UIMessage,
+} from "ai";
 import {
   getThreadMessages,
   listThreads,
@@ -104,6 +109,7 @@ import {
   Edit2,
   Check,
   X,
+  ShieldAlert,
 } from "lucide-react";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -780,10 +786,11 @@ function Chat({
     [threadId, isTemporary],
   );
 
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, addToolApprovalResponse } = useChat({
     id: threadId,
     messages: initial,
     transport,
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     onError: (e) => {
       console.error("[Coach Ziri Chat Error]:", e);
       if (e.message?.toLowerCase().includes("abort") || e.name === "AbortError") return;
@@ -1531,22 +1538,99 @@ function Chat({
                     ) {
                       const tp = part as {
                         type: `tool-${string}`;
-                        state?:
-                          | "input-streaming"
-                          | "input-available"
-                          | "output-available"
-                          | "output-error";
-                        input?: unknown;
+                        state?: ToolUIPart["state"];
+                        input?: Record<string, unknown>;
                         output?: unknown;
                         errorText?: string;
+                        approval?: {
+                          id: string;
+                          approved?: boolean;
+                          reason?: string;
+                        };
                       };
+                      const toolName = tp.type.slice(5);
+                      const isApprovalRequested = tp.state === "approval-requested";
+                      const approvalId = tp.approval?.id;
                       return (
-                        <Tool key={i} defaultOpen={false}>
+                        <Tool key={i} defaultOpen={isApprovalRequested}>
                           <ToolHeader
                             type={tp.type}
                             state={tp.state ?? "output-available"}
                           />
                           <ToolContent>
+                            {isApprovalRequested && approvalId && (
+                              <div className="mx-3 mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2.5">
+                                <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                                  <ShieldAlert className="size-4 shrink-0" />
+                                  <span>
+                                    {toolName === "send_email" || toolName === "reply_to_email"
+                                      ? "Confirm sending email"
+                                      : toolName === "delete_task"
+                                        ? "Confirm deleting task"
+                                        : toolName === "delete_calendar_event"
+                                          ? "Confirm deleting calendar event"
+                                          : `Confirm ${toolName.replaceAll("_", " ")}`}
+                                  </span>
+                                </div>
+                                {(toolName === "send_email" || toolName === "reply_to_email") &&
+                                  tp.input && (
+                                    <div className="rounded-md bg-background/80 p-2.5 text-xs space-y-1 border">
+                                      {typeof tp.input.to === "string" && (
+                                        <div>
+                                          <span className="font-medium text-muted-foreground">To: </span>
+                                          <span>{tp.input.to}</span>
+                                        </div>
+                                      )}
+                                      {typeof tp.input.subject === "string" && (
+                                        <div>
+                                          <span className="font-medium text-muted-foreground">Subject: </span>
+                                          <span>{tp.input.subject}</span>
+                                        </div>
+                                      )}
+                                      {typeof tp.input.body === "string" && (
+                                        <p className="mt-1 whitespace-pre-wrap text-muted-foreground line-clamp-4">
+                                          {tp.input.body}
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    size="sm"
+                                    className="h-7 gap-1.5 text-xs"
+                                    onClick={() =>
+                                      addToolApprovalResponse({
+                                        id: approvalId,
+                                        approved: true,
+                                      })
+                                    }
+                                  >
+                                    <Check className="size-3.5" />
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 gap-1.5 text-xs"
+                                    onClick={() =>
+                                      addToolApprovalResponse({
+                                        id: approvalId,
+                                        approved: false,
+                                        reason: "User cancelled the action.",
+                                      })
+                                    }
+                                  >
+                                    <X className="size-3.5" />
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                            {tp.state === "output-denied" && (
+                              <div className="mx-3 mt-3 rounded-md border border-orange-500/30 bg-orange-500/5 px-3 py-2 text-xs text-orange-700 dark:text-orange-300">
+                                Action cancelled by user.
+                              </div>
+                            )}
                             {tp.input != null && <ToolInput input={tp.input} />}
                             {(tp.output != null || tp.errorText) && (
                               <ToolOutput

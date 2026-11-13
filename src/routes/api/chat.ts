@@ -264,6 +264,7 @@ You have tools for tasks, habits, goals, long-term memory, web search, calendar,
             delete_task: tool({
               description: "Delete a task by id.",
               inputSchema: z.object({ id: z.string().uuid() }),
+              needsApproval: true,
               execute: async ({ id }) => {
                 const { error } = await supabase.from("tasks").delete().eq("id", id);
                 if (error) return { error: error.message };
@@ -583,6 +584,7 @@ You have tools for tasks, habits, goals, long-term memory, web search, calendar,
               inputSchema: z.object({
                 eventId: z.string().min(1).describe("The Google Calendar event ID"),
               }),
+              needsApproval: true,
               execute: async ({ eventId }) => {
                 try {
                   const token = await resolveGoogleToken();
@@ -727,6 +729,7 @@ You have tools for tasks, habits, goals, long-term memory, web search, calendar,
                 subject: z.string().min(1).max(300),
                 body: z.string().min(1).max(10000),
               }),
+              needsApproval: true,
               execute: async ({ to, subject, body: emailBody }) => {
                 try {
                   const token = await resolveGoogleToken();
@@ -758,6 +761,7 @@ You have tools for tasks, habits, goals, long-term memory, web search, calendar,
                 threadId: z.string().min(1),
                 body: z.string().min(1).max(10000),
               }),
+              needsApproval: true,
               execute: async ({ to, subject, threadId, body: emailBody }) => {
                 try {
                   const token = await resolveGoogleToken();
