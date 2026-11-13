@@ -6,20 +6,17 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS last_evening_briefing_date DATE;
 
 -- Optional Supabase pg_cron schedule (every 15 minutes) for /api/public/send-briefings:
-/*
-SELECT cron.schedule(
-  'dispatch-daily-briefings',
-  '*/15 * * * *',
-  $$
-  SELECT net.http_post(
-    url := 'https://coach-ziri.okikeenterprises.com/api/public/send-briefings',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ziri-push-secret-2026'
-    ),
-    body := '{}'::jsonb
-  );
-  $$
-);
-*/
-
+-- SELECT cron.schedule(
+--   'dispatch-daily-briefings',
+--   '*/15 * * * *',
+--   $$
+--   SELECT net.http_post(
+--     url := 'https://coach-ziri.okikeenterprises.com/api/public/send-briefings',
+--     headers := jsonb_build_object(
+--       'Content-Type', 'application/json',
+--       'Authorization', 'Bearer ziri-push-secret-2026'
+--     ),
+--     body := '{}'::jsonb
+--   );
+--   $$
+-- );
