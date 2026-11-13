@@ -352,14 +352,7 @@ function VoiceCallModal({
   onMinimize: () => void;
   onEndCall: () => void;
 }) {
-  const [ticker, setTicker] = useState(0);
   const [seconds, setSeconds] = useState(0);
-
-  useEffect(() => {
-    if (!open) return;
-    const t = setInterval(() => setTicker((x) => (x + 1) % 360), 60);
-    return () => clearInterval(t);
-  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -375,57 +368,42 @@ function VoiceCallModal({
   const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
   const secs = String(seconds % 60).padStart(2, "0");
 
-  // Dynamic orb scale based on mic volume or speaking state
-  const dynamicScale =
-    callState === "speaking"
-      ? 1.08 + Math.abs(Math.sin(ticker / 4)) * 0.16
-      : callState === "thinking"
-        ? 1.0 + Math.sin(ticker / 6) * 0.06
-        : micMuted
-          ? 0.95
-          : 1.0 + micVolume * 0.35;
-
-  const stateHeadline = micMuted
-    ? "Microphone Muted"
+  const statusLabel = micMuted
+    ? "Muted"
     : callState === "speaking"
-      ? "Coach Ziri is speaking"
+      ? "Speaking"
       : callState === "thinking"
         ? activeToolName
-          ? `Executing ${activeToolName.replace(/_/g, " ")}…`
-          : "Coach Ziri is thinking…"
-        : "Listening to you…";
+          ? `Running ${activeToolName.replace(/_/g, " ")}`
+          : "Thinking"
+        : "Listening";
 
-  const stateSubtext = micMuted
-    ? "Tap Unmute below whenever you're ready to speak"
+  const statusPillClass = micMuted
+    ? "bg-destructive/10 text-destructive border-destructive/30"
     : callState === "speaking"
-      ? "Speak anytime or tap Interrupt to jump in"
+      ? "bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/30"
       : callState === "thinking"
-        ? "Analyzing your workspace & preparing response"
-        : liveTranscript
-          ? `"${liveTranscript}"`
-          : "Speak naturally — I'm listening";
-
-  const waveBars = Array.from({ length: 24 }, (_, idx) => idx);
+        ? "bg-blue-500/15 text-blue-600 dark:text-blue-300 border-blue-500/30"
+        : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border-emerald-500/30";
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-between bg-[#050507]/95 backdrop-blur-2xl text-[#F3F4F6] p-6 sm:p-10 animate-in fade-in duration-200 select-none overflow-hidden">
-      {/* Subtle Ambient Gold Glows */}
-      <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[480px] rounded-full bg-[#D4AF37]/10 blur-[140px]" />
-
-      {/* Top Header Bar */}
-      <div className="relative z-10 w-full max-w-3xl flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-between bg-background/95 backdrop-blur-xl text-foreground p-5 sm:p-8 animate-in fade-in duration-150 select-none">
+      {/* Top Bar */}
+      <div className="w-full max-w-2xl flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-[#0F111A] border border-[#D4AF37]/40 flex items-center justify-center shadow-[0_0_20px_rgba(212,175,55,0.2)]">
-            <Sparkles className="h-4 w-4 text-[#D4AF37]" />
+          <div className="h-9 w-9 rounded-xl bg-card border flex items-center justify-center shadow-xs">
+            <img src="/logo.png" alt="Coach Ziri" className="h-5 w-5 object-contain" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold tracking-tight text-white">Coach Ziri Live</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                {mins}:{secs}
+              <span className="text-sm font-semibold">Coach Ziri</span>
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium border ${statusPillClass}`}>
+                {statusLabel}
               </span>
             </div>
-            <p className="text-[11px] text-[#8A8F9E]">Hands-free Neural Voice Session</p>
+            <p className="text-xs text-muted-foreground font-mono">
+              {mins}:{secs}
+            </p>
           </div>
         </div>
 
@@ -434,180 +412,110 @@ function VoiceCallModal({
           variant="outline"
           size="sm"
           onClick={onMinimize}
-          className="rounded-xl bg-[#0F111A] border-[#1F2336] text-xs text-[#A0A5B5] hover:text-white hover:border-[#D4AF37]/40 gap-1.5"
+          className="gap-1.5 text-xs"
         >
           <Minimize2 className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Minimize to Chat</span>
+          <span>Minimize</span>
         </Button>
       </div>
 
-      {/* Center Neural Orb & Live Captions */}
-      <div className="relative z-10 flex flex-col items-center justify-center my-auto max-w-2xl w-full text-center space-y-8 px-4">
-        {/* Animated Concentric Aura Rings */}
-        <div className="relative flex items-center justify-center h-56 w-56 sm:h-64 sm:w-64">
-          {/* Outer Pulse Ring */}
+      {/* Center Status & Live Captions */}
+      <div className="flex flex-col items-center justify-center my-auto max-w-xl w-full text-center space-y-6 px-2">
+        <div className="relative flex items-center justify-center">
           <div
-            className={`absolute inset-0 rounded-full transition-transform duration-150 ${
-              callState === "speaking"
-                ? "border-2 border-[#D4AF37]/40 bg-[#D4AF37]/5 shadow-[0_0_80px_rgba(212,175,55,0.3)]"
-                : callState === "thinking"
-                  ? "border border-blue-400/30 bg-blue-500/5 animate-spin"
-                  : "border border-[#D4AF37]/25 bg-[#D4AF37]/5"
+            className={`h-28 w-28 rounded-full flex items-center justify-center border-2 transition-all duration-300 bg-card shadow-sm ${
+              micMuted
+                ? "border-destructive/40 opacity-75"
+                : callState === "speaking"
+                  ? "border-amber-500 ring-8 ring-amber-500/15 scale-105"
+                  : callState === "thinking"
+                    ? "border-blue-500 ring-8 ring-blue-500/10 animate-pulse"
+                    : "border-emerald-500 ring-8 ring-emerald-500/15"
             }`}
-            style={{ transform: `scale(${dynamicScale * 1.15})` }}
-          />
-
-          {/* Middle Harmonic Ring */}
-          <div
-            className={`absolute inset-6 rounded-full transition-transform duration-100 ${
-              callState === "speaking"
-                ? "border border-[#F5E0A3]/50 bg-gradient-to-b from-[#D4AF37]/20 to-transparent"
-                : callState === "thinking"
-                  ? "border border-blue-400/40 bg-blue-500/10"
-                  : "border border-emerald-400/30 bg-emerald-500/5"
-            }`}
-            style={{ transform: `scale(${dynamicScale})` }}
-          />
-
-          {/* Core Luxury Orb */}
-          <div
-            onClick={
-              callState === "speaking"
-                ? onInterrupt
-                : callState === "listening" && liveTranscript.trim().length > 0
-                  ? onForceSend
-                  : undefined
-            }
-            className={`relative h-32 w-32 sm:h-36 sm:w-36 rounded-full flex flex-col items-center justify-center transition-all duration-150 shadow-[0_0_50px_rgba(212,175,55,0.35)] border ${
-              callState === "speaking"
-                ? "bg-gradient-to-br from-[#F5E0A3] via-[#D4AF37] to-[#8C6508] border-[#FFF3C4] cursor-pointer"
-                : callState === "thinking"
-                  ? "bg-gradient-to-br from-[#141829] via-[#0F111A] to-[#050507] border-blue-400/50"
-                  : micMuted
-                    ? "bg-[#141624] border-red-500/40"
-                    : liveTranscript.trim().length > 0
-                      ? "bg-gradient-to-br from-[#1B1810] via-[#0F111A] to-[#050507] border-emerald-400 cursor-pointer"
-                      : "bg-gradient-to-br from-[#1B1810] via-[#0F111A] to-[#050507] border-[#D4AF37]/60"
-            }`}
-            style={{ transform: `scale(${Math.max(0.92, Math.min(1.18, dynamicScale))})` }}
           >
-            <img
-              src="/logo.png"
-              alt="Coach Ziri"
-              className={`h-14 w-auto object-contain transition-transform ${
-                callState === "speaking" ? "brightness-110 scale-105" : " drop-shadow-[0_0_12px_rgba(212,175,55,0.5)]"
-              }`}
-            />
+            <img src="/logo.png" alt="Coach Ziri" className="h-12 w-12 object-contain" />
           </div>
         </div>
 
-        {/* 24-Bar Equalizer Spectrum */}
-        <div className="flex items-center justify-center gap-1 h-10 w-full max-w-xs">
-          {waveBars.map((i) => {
-            const centerDist = Math.abs(i - 11.5) / 11.5;
-            const envelope = 1 - centerDist * 0.65;
-            let barH = 14;
-            if (callState === "speaking") {
-              barH = 18 + Math.abs(Math.sin(ticker / 2.2 + i * 0.55)) * 82 * envelope;
-            } else if (callState === "thinking") {
-              barH = 16 + Math.abs(Math.cos(ticker / 4 + i * 0.4)) * 45 * envelope;
-            } else if (!micMuted) {
-              barH = Math.max(12, Math.min(100, micVolume * 145 * envelope * (0.7 + ((i * 7) % 5) * 0.1)));
-            }
-            return (
-              <span
-                key={i}
-                className={`w-1 rounded-full transition-all duration-75 ${
-                  callState === "speaking"
-                    ? "bg-gradient-to-t from-[#AA7C11] to-[#F5E0A3]"
-                    : callState === "thinking"
-                      ? "bg-blue-400/80"
-                      : micMuted
-                        ? "bg-red-500/30"
-                        : micVolume > 0.08
-                          ? "bg-emerald-400"
-                          : "bg-[#D4AF37]/40"
-                }`}
-                style={{ height: `${barH}%` }}
-              />
-            );
-          })}
-        </div>
-
-        {/* Status Headline & Live Transcript / Subtitles */}
-        <div className="space-y-3 max-w-xl min-h-[96px] flex flex-col items-center justify-center">
-          <span className="text-xs font-mono uppercase tracking-[0.2em] text-[#D4AF37] font-semibold">
-            {stateHeadline}
-          </span>
-
+        <div className="w-full rounded-2xl border bg-card/80 p-5 shadow-xs min-h-[120px] flex flex-col items-center justify-center space-y-2">
           {callState === "speaking" && spokenText ? (
-            <p className="text-base sm:text-lg font-medium text-white/95 leading-relaxed line-clamp-4 animate-in fade-in">
-              "{spokenText}"
-            </p>
+            <>
+              <span className="text-[11px] font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                Coach Ziri
+              </span>
+              <p className="text-sm sm:text-base font-medium leading-relaxed line-clamp-5">
+                {spokenText}
+              </p>
+            </>
+          ) : liveTranscript ? (
+            <>
+              <span className="text-[11px] font-medium uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                You
+              </span>
+              <p className="text-sm sm:text-base font-medium leading-relaxed">
+                "{liveTranscript}"
+              </p>
+            </>
           ) : (
-            <p
-              className={`text-sm sm:text-base leading-relaxed transition-colors ${
-                liveTranscript ? "text-emerald-300 font-medium" : "text-[#8A8F9E]"
-              }`}
-            >
-              {stateSubtext}
+            <p className="text-sm text-muted-foreground">
+              {micMuted
+                ? "Microphone is muted. Tap Unmute to speak."
+                : callState === "thinking"
+                  ? "Thinking…"
+                  : "Speak naturally — Ziri is listening."}
             </p>
           )}
         </div>
       </div>
 
-      {/* Bottom Call Control Dock */}
-      <div className="relative z-10 flex items-center justify-center gap-4 sm:gap-6 pb-2">
-        {/* Mute / Unmute Mic */}
-        <button
+      {/* Bottom Controls */}
+      <div className="flex items-center justify-center gap-3 pb-2">
+        <Button
           type="button"
+          variant={micMuted ? "destructive" : "outline"}
+          size="lg"
           onClick={onToggleMute}
-          className={`h-14 w-14 rounded-full flex items-center justify-center border transition-all cursor-pointer ${
-            micMuted
-              ? "bg-red-500/20 border-red-500/50 text-red-400 hover:bg-red-500/30"
-              : "bg-[#0F111A] border-[#1F2336] text-white hover:border-[#D4AF37]/50 hover:bg-[#141624]"
-          }`}
-          title={micMuted ? "Unmute microphone" : "Mute microphone"}
-          aria-label={micMuted ? "Unmute microphone" : "Mute microphone"}
+          className="rounded-full h-12 px-5 gap-2"
         >
-          {micMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-        </button>
+          {micMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+          <span>{micMuted ? "Unmute" : "Mute"}</span>
+        </Button>
 
-        {/* Interrupt / Tap to Speak (Active while Ziri is speaking) */}
         {callState === "speaking" && (
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="lg"
             onClick={onInterrupt}
-            className="h-14 px-6 rounded-full flex items-center gap-2 bg-[#141624] border border-[#D4AF37]/50 text-[#F5E0A3] text-xs font-bold uppercase tracking-wider hover:bg-[#D4AF37] hover:text-black transition-all shadow-[0_0_25px_rgba(212,175,55,0.2)] cursor-pointer"
+            className="rounded-full h-12 px-5 gap-2"
           >
             <Hand className="h-4 w-4" />
             <span>Interrupt</span>
-          </button>
+          </Button>
         )}
 
-        {/* Tap to Send Immediately (Active when words are heard in noisy environments) */}
         {callState === "listening" && liveTranscript.trim().length > 0 && (
-          <button
+          <Button
             type="button"
+            size="lg"
             onClick={onForceSend}
-            className="h-14 px-6 rounded-full flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-[#050507] text-xs font-bold uppercase tracking-wider transition-all shadow-[0_0_25px_rgba(16,185,129,0.35)] cursor-pointer animate-in fade-in"
-            title="Send spoken words now"
+            className="rounded-full h-12 px-5 gap-2"
           >
             <Sparkles className="h-4 w-4" />
             <span>Send Now</span>
-          </button>
+          </Button>
         )}
 
-        {/* End Call Button */}
-        <button
+        <Button
           type="button"
+          variant="destructive"
+          size="lg"
           onClick={onEndCall}
-          className="h-14 px-7 rounded-full flex items-center gap-2.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider shadow-[0_0_30px_rgba(220,38,38,0.4)] hover:scale-105 transition-all cursor-pointer"
-          title="End voice call"
+          className="rounded-full h-12 px-6 gap-2"
         >
           <PhoneOff className="h-4 w-4" />
           <span>End Call</span>
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -793,6 +701,11 @@ function Chat({
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     onError: (e) => {
       console.error("[Coach Ziri Chat Error]:", e);
+      if (callActiveRef.current) {
+        callStateRef.current = "listening";
+        setCallState("listening");
+        setLiveTranscript("");
+      }
       if (e.message?.toLowerCase().includes("abort") || e.name === "AbortError") return;
       toast.error(e.message || "An error occurred.");
     },
@@ -1101,6 +1014,11 @@ function Chat({
         }
       };
 
+      audio.onerror = () => {
+        URL.revokeObjectURL(firstUrl);
+        speakWithBrowserFallback(clean);
+      };
+
       await audio.play().catch(() => {
         URL.revokeObjectURL(firstUrl);
         speakWithBrowserFallback(clean);
@@ -1151,7 +1069,13 @@ function Chat({
       .join(" ")
       .trim();
 
-    if (!text) return;
+    if (!text) {
+      if (callActiveRef.current) {
+        setCallStateSynced("listening");
+        setTimeout(() => startListening(), 350);
+      }
+      return;
+    }
 
     if (spokenRef.current.has(last.id)) return;
     spokenRef.current.add(last.id);
@@ -1316,9 +1240,8 @@ function Chat({
     }
   }, [liveTranscript, commitSpokenTranscript, startListening]);
 
-  // Live microphone volume metering — keep stream open during call so getUserMedia doesn't fight SpeechRecognition
-  const isMicMeteringActive =
-    recording || (callActive && !micMuted);
+  // Live microphone volume metering only for standalone mic dictation (avoid fighting SpeechRecognition during call)
+  const isMicMeteringActive = recording;
   const micVolume = useMicVolume(isMicMeteringActive);
 
   return (

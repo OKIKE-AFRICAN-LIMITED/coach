@@ -13,6 +13,7 @@ import type { Database } from "@/integrations/supabase/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getGoogleAccessToken } from "@/lib/google.functions";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 try {
   // Always load live .env file in Node runtime so keys are never stale
@@ -50,6 +51,15 @@ export const Route = createFileRoute("/api/chat")({
           return new Response("Unauthorized", { status: 401 });
         }
         const userId = claims.claims.sub;
+        const minRl = checkRateLimit(`chat:min:${userId}`, 20, 60_000);
+        if (!minRl.allowed) {
+          return rateLimitResponse(minRl.retryAfterSeconds, "You're sending messages too quickly. Please wait a few seconds.");
+        }
+        const hrRl = checkRateLimit(`chat:hr:${userId}`, 150, 60 * 60_000);
+        if (!hrRl.allowed) {
+          return rateLimitResponse(hrRl.retryAfterSeconds, "Hourly chat limit reached. Please try again shortly.");
+        }
+
         const liveGoogleToken = request.headers.get("x-google-access-token") ?? undefined;
         const resolveGoogleToken = async () => {
           if (liveGoogleToken && liveGoogleToken.startsWith("ya29.")) {
@@ -66,51 +76,61 @@ export const Route = createFileRoute("/api/chat")({
         };
         const isTemporary = Boolean(body.isTemporary || body.threadId === "temp");
 
-        if (!isTemporary) {
-          if (!body.threadId) return new Response("Missing threadId", { status: 400 });
+        if (!isTemporary && !body.threadId) {
+          return new Response("Missing threadId", { status: 400 });
+        }
 
-          // Verify thread ownership and persist the last user message
-          const { data: thread, error: threadErr } = await supabase
-            .from("chat_threads")
-            .select("id, title")
-            .eq("id", body.threadId)
-            .maybeSingle();
-          if (threadErr || !thread) return new Response("Thread not found", { status: 404 });
+        // Run thread ownership check, open tasks summary, and user memories in parallel to minimize TTFB
+        const [threadRes, tasksRes, memRes] = await Promise.all([
+          isTemporary
+            ? Promise.resolve({ data: { id: "temp", title: "Temporary Chat" }, error: null })
+            : supabase
+                .from("chat_threads")
+                .select("id, title")
+                .eq("id", body.threadId)
+                .maybeSingle(),
+          supabase
+            .from("tasks")
+            .select("id, due_at, created_at")
+            .eq("status", "todo"),
+          supabase
+            .from("user_memories")
+            .select("id, category, content")
+            .eq("user_id", userId)
+            .order("updated_at", { ascending: false })
+            .limit(25),
+        ]);
 
+        if (!isTemporary && (threadRes.error || !threadRes.data)) {
+          return new Response("Thread not found", { status: 404 });
+        }
+
+        if (!isTemporary && threadRes.data) {
+          const thread = threadRes.data;
           const lastUser = [...body.messages].reverse().find((m) => m.role === "user");
           if (lastUser) {
-            await supabase.from("chat_messages").insert({
+            // Persist user message & auto-title without blocking stream startup
+            void supabase.from("chat_messages").insert({
               thread_id: body.threadId,
               user_id: userId,
               role: "user",
               parts: lastUser.parts as unknown as Database["public"]["Tables"]["chat_messages"]["Insert"]["parts"],
             });
-            // Auto-title from first user message
             if (thread.title === "New chat") {
               const text = lastUser.parts
                 .map((p) => (p.type === "text" ? p.text : ""))
                 .join(" ")
                 .slice(0, 80);
               if (text) {
-                await supabase.from("chat_threads").update({ title: text }).eq("id", body.threadId);
+                void supabase.from("chat_threads").update({ title: text }).eq("id", body.threadId);
               }
             }
           }
         }
 
-        // Briefing context for the system prompt
-        const { data: openTasks } = await supabase
-          .from("tasks")
-          .select("*")
-          .eq("status", "todo");
-
-        // Load cross-thread long-term memories for this user (graceful if migration not yet applied)
-        const { data: userMemories, error: memErr } = await supabase
-          .from("user_memories")
-          .select("id, category, content")
-          .eq("user_id", userId)
-          .order("updated_at", { ascending: false })
-          .limit(25);
+        const openTasks = tasksRes.data;
+        const userMemories = memRes.data;
+        const memErr = memRes.error;
         const memoriesBlock =
           !memErr && userMemories && userMemories.length > 0
             ? `\n\nLONG-TERM USER MEMORY (persisted across all chats):\n${userMemories
@@ -146,7 +166,7 @@ You are built and powered by OKIKE Enterprises (https://okikeenterprises.com), o
 
 You have tools for tasks, habits, goals, long-term memory, web search, calendar, and email. When the user shares durable personal preferences, key contacts (names/emails), routines, or asks you to remember something for future chats, call remember_fact${isTemporary ? " (note: this session is Temporary/Incognito, so do not save new memories unless they switch to a saved chat)" : ""}. Always confirm actions briefly after doing them. When reading aloud, spell out times naturally (e.g. "three thirty PM"). Never paste raw URLs or JSON.`;
 
-        const groqModelName = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
+        const groqModelName = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
         console.log("[api/chat] Using Groq Model:", groqModelName);
         const groq = createOpenAICompatible({
           name: "groq",

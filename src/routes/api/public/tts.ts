@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 // In-memory audio cache so repeated or identical phrases respond in 0ms
 const audioCache = new Map<string, ArrayBuffer>();
@@ -123,6 +124,16 @@ export const Route = createFileRoute("/api/public/tts")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const ip = getClientIp(request);
+        const minLimit = checkRateLimit(`tts:min:${ip}`, 15, 60_000);
+        if (!minLimit.allowed) {
+          return rateLimitResponse(minLimit.retryAfterSeconds, "Voice rate limit reached. Please wait a moment.");
+        }
+        const hrLimit = checkRateLimit(`tts:hr:${ip}`, 120, 60 * 60_000);
+        if (!hrLimit.allowed) {
+          return rateLimitResponse(hrLimit.retryAfterSeconds, "Hourly voice synthesis limit reached.");
+        }
+
         const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
         if (!key) return new Response("TTS not configured", { status: 500 });
 

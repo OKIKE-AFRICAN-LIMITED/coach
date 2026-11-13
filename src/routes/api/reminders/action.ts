@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { verifyReminderActionToken } from "@/lib/push-notifications";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 import type { Database } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/api/reminders/action")({
@@ -9,6 +10,12 @@ export const Route = createFileRoute("/api/reminders/action")({
     handlers: {
       POST: async ({ request }) => {
         try {
+          const ip = getClientIp(request);
+          const rl = checkRateLimit(`reminders:action:${ip}`, 30, 60_000);
+          if (!rl.allowed) {
+            return rateLimitResponse(rl.retryAfterSeconds);
+          }
+
           const body = (await request.json()) as {
             action?: "snooze" | "dismiss";
             taskId?: string;
