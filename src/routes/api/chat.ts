@@ -466,25 +466,30 @@ You have tools for tasks, habits, goals, long-term memory, web search, calendar,
               description: "Search the web for current information, news, facts. Returns top results with snippets.",
               inputSchema: z.object({
                 query: z.string().min(1).max(300),
-                limit: z.number().int().min(1).max(8).default(5),
+                limit: z.coerce.number().optional(),
               }),
               execute: async ({ query, limit }) => {
                 const key = process.env.FIRECRAWL_API_KEY;
                 if (!key) return { error: "Web search not configured" };
+                const safeLimit = Math.min(8, Math.max(1, Math.round(Number(limit) || 5)));
                 try {
                   const res = await fetch("https://api.firecrawl.dev/v2/search", {
                     method: "POST",
+                    signal: AbortSignal.timeout(10_000),
                     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-                    body: JSON.stringify({ query, limit }),
+                    body: JSON.stringify({ query: query.trim(), limit: safeLimit }),
                   });
-                  if (!res.ok) return { error: `Search failed: ${res.status}` };
+                  if (!res.ok) {
+                    const errText = await res.text().catch(() => "");
+                    return { error: `Search failed (${res.status}): ${errText.slice(0, 120)}` };
+                  }
                   const data = await res.json();
                   const items = (data?.data?.web ?? data?.data ?? []) as Array<{ url?: string; title?: string; description?: string }>;
                   return {
-                    results: items.slice(0, limit).map((r) => ({
-                      title: r.title,
-                      url: r.url,
-                      snippet: r.description,
+                    results: items.slice(0, safeLimit).map((r) => ({
+                      title: r.title ?? "",
+                      url: r.url ?? "",
+                      snippet: (r.description ?? "").slice(0, 400),
                     })),
                   };
                 } catch (e) {
@@ -495,15 +500,17 @@ You have tools for tasks, habits, goals, long-term memory, web search, calendar,
             list_calendar_events: tool({
               description: "List upcoming Google Calendar events from the user's primary calendar.",
               inputSchema: z.object({
-                hoursAhead: z.number().int().min(1).max(720).default(72),
-                maxResults: z.number().int().min(1).max(20).default(10),
+                hoursAhead: z.coerce.number().optional(),
+                maxResults: z.coerce.number().optional(),
               }),
               execute: async ({ hoursAhead, maxResults }) => {
+                const safeHours = Math.min(720, Math.max(1, Math.round(Number(hoursAhead) || 72)));
+                const safeMax = Math.min(20, Math.max(1, Math.round(Number(maxResults) || 10)));
                 try {
                   const token = await resolveGoogleToken();
                   const timeMin = new Date().toISOString();
-                  const timeMax = new Date(Date.now() + hoursAhead * 3600 * 1000).toISOString();
-                  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults=${maxResults}&timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`;
+                  const timeMax = new Date(Date.now() + safeHours * 3600 * 1000).toISOString();
+                  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults=${safeMax}&timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`;
                   const res = await fetch(url, {
                     headers: { Authorization: `Bearer ${token}` },
                   });
